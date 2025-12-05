@@ -35,6 +35,26 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 
 ### Quick Install
 
+✕ [API Error: [{
+    "error": {
+      "code": 404,
+      "message": "Requested entity was not found.",
+      "errors": [
+        {
+          "message": "Requested entity was not found.",
+          "domain": "global",
+          "reason": "notFound"
+        }
+      ],
+      "status": "NOT_FOUND"
+    }
+  }
+  ]]
+
+
+
+
+
 #### Run instantly with npx
 
 ```bash
