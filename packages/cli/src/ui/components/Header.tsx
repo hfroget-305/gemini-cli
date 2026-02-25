@@ -18,6 +18,7 @@ import {
 import { getAsciiArtWidth } from '../utils/textUtils.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { getTerminalProgram } from '../utils/terminalSetup.js';
+import { SCREEN_READER_LOGO_LABEL } from '../textConstants.js';
 
 interface HeaderProps {
   customAsciiArt?: string; // For user-defined ASCII art
@@ -55,7 +56,9 @@ export const Header: React.FC<HeaderProps> = ({
       flexShrink={0}
       flexDirection="column"
     >
-      <ThemedGradient>{displayTitle}</ThemedGradient>
+      <ThemedGradient aria-label={SCREEN_READER_LOGO_LABEL}>
+        {displayTitle}
+      </ThemedGradient>
       {nightly && (
         <Box width="100%" flexDirection="row" justifyContent="flex-end">
           <ThemedGradient>v{version}</ThemedGradient>
