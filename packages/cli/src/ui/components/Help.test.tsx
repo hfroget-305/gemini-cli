@@ -67,6 +67,7 @@ describe('Help Component', () => {
 
     expect(output).toContain('Keyboard Shortcuts:');
     expect(output).toContain('Ctrl+C');
+    expect(output).toContain('Ctrl+R');
     expect(output).toContain('Ctrl+S');
     expect(output).toContain('Page Up/Down');
     unmount();
