@@ -7,6 +7,7 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../../semantic-colors.js';
+import { SCREEN_READER_WARNING } from '../../textConstants.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 
 interface WarningMessageProps {
@@ -20,7 +21,9 @@ export const WarningMessage: React.FC<WarningMessageProps> = ({ text }) => {
   return (
     <Box flexDirection="row" marginTop={1}>
       <Box width={prefixWidth}>
-        <Text color={theme.status.warning}>{prefix}</Text>
+        <Text color={theme.status.warning} aria-label={SCREEN_READER_WARNING}>
+          {prefix}
+        </Text>
       </Box>
       <Box flexGrow={1}>
         <Text wrap="wrap">

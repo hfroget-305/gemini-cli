@@ -11,3 +11,11 @@ export const SCREEN_READER_MODEL_PREFIX = 'Model: ';
 export const SCREEN_READER_LOADING = 'loading';
 
 export const SCREEN_READER_RESPONDING = 'responding';
+
+export const SCREEN_READER_INFO = '[info] ';
+
+export const SCREEN_READER_WARNING = '[warning] ';
+
+export const SCREEN_READER_ERROR = '[error] ';
+
+export const SCREEN_READER_DEBUG = '[debug] ';

@@ -7,6 +7,7 @@
 import type React from 'react';
 import { Text, Box } from 'ink';
 import { theme } from '../../semantic-colors.js';
+import { SCREEN_READER_ERROR } from '../../textConstants.js';
 
 interface ErrorMessageProps {
   text: string;
@@ -19,7 +20,9 @@ export const ErrorMessage: React.FC<ErrorMessageProps> = ({ text }) => {
   return (
     <Box flexDirection="row" marginBottom={1}>
       <Box width={prefixWidth}>
-        <Text color={theme.status.error}>{prefix}</Text>
+        <Text color={theme.status.error} aria-label={SCREEN_READER_ERROR}>
+          {prefix}
+        </Text>
       </Box>
       <Box flexGrow={1}>
         <Text wrap="wrap" color={theme.status.error}>
