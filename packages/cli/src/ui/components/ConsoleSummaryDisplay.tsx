@@ -5,8 +5,9 @@
  */
 
 import type React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { theme } from '../semantic-colors.js';
+import { SCREEN_READER_ERROR } from '../textConstants.js';
 
 interface ConsoleSummaryDisplayProps {
   errorCount: number;
@@ -16,11 +17,13 @@ interface ConsoleSummaryDisplayProps {
 export const ConsoleSummaryDisplay: React.FC<ConsoleSummaryDisplayProps> = ({
   errorCount,
 }) => {
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
+
   if (errorCount === 0) {
     return null;
   }
 
-  const errorIcon = '\u2716'; // Heavy multiplication x (✖)
+  const errorIcon = isScreenReaderEnabled ? SCREEN_READER_ERROR : '\u2716'; // Heavy multiplication x (✖)
 
   return (
     <Box>
