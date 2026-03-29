@@ -5,9 +5,10 @@
  */
 
 import type React from 'react';
-import { Text, Box } from 'ink';
+import { Text, Box, useIsScreenReaderEnabled } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
+import { INFO_ICON, SCREEN_READER_INFO } from '../../textConstants.js';
 
 interface InfoMessageProps {
   text: string;
@@ -20,13 +21,23 @@ export const InfoMessage: React.FC<InfoMessageProps> = ({
   icon,
   color,
 }) => {
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
   color ??= theme.status.warning;
-  const prefix = icon ?? 'ℹ ';
-  const prefixWidth = prefix.length;
+
+  let prefix: string;
+  let prefixWidth: number;
+
+  if (isScreenReaderEnabled) {
+    prefix = icon ? `[${icon}] ` : SCREEN_READER_INFO;
+    prefixWidth = 11;
+  } else {
+    prefix = icon ? `${icon} ` : `${INFO_ICON} `;
+    prefixWidth = Math.max(3, prefix.length);
+  }
 
   return (
     <Box flexDirection="row" marginTop={1}>
-      <Box width={prefixWidth}>
+      <Box width={prefixWidth} flexShrink={0}>
         <Text color={color}>{prefix}</Text>
       </Box>
       <Box flexGrow={1} flexDirection="column">
