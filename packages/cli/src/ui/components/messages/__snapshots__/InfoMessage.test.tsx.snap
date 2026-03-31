@@ -8,7 +8,7 @@ exports[`InfoMessage > renders multiline info messages 1`] = `
 
 exports[`InfoMessage > renders with a custom icon 1`] = `
 "
-★Custom icon test"
+★ Custom icon test"
 `;
 
 exports[`InfoMessage > renders with the correct default prefix and text 1`] = `
