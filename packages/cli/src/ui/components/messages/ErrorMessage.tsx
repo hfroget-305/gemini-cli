@@ -5,21 +5,26 @@
  */
 
 import type React from 'react';
-import { Text, Box } from 'ink';
+import { Text, Box, useIsScreenReaderEnabled } from 'ink';
 import { theme } from '../../semantic-colors.js';
+import { ERROR_ICON, SCREEN_READER_ERROR } from '../../textConstants.js';
 
 interface ErrorMessageProps {
   text: string;
 }
 
 export const ErrorMessage: React.FC<ErrorMessageProps> = ({ text }) => {
-  const prefix = '✕ ';
-  const prefixWidth = prefix.length;
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
+  const icon = ERROR_ICON + ' ';
+  const srPrefix = SCREEN_READER_ERROR;
+  const prefixWidth = isScreenReaderEnabled ? srPrefix.length : icon.length;
 
   return (
     <Box flexDirection="row" marginBottom={1}>
-      <Box width={prefixWidth}>
-        <Text color={theme.status.error}>{prefix}</Text>
+      <Box width={prefixWidth} flexShrink={0}>
+        <Text color={theme.status.error}>
+          {isScreenReaderEnabled ? srPrefix : icon}
+        </Text>
       </Box>
       <Box flexGrow={1}>
         <Text wrap="wrap" color={theme.status.error}>
