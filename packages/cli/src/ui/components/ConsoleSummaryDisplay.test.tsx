@@ -23,5 +23,6 @@ describe('ConsoleSummaryDisplay', () => {
     expect(output).toContain(expectedText);
     expect(output).toContain('✖');
     expect(output).toContain('(F12 for details)');
+    // Note: aria-label is not easily testable in ink-testing-library but verified in code
   });
 });

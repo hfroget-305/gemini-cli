@@ -7,6 +7,7 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
+import { ERROR_ICON, SCREEN_READER_ERROR } from '../textConstants.js';
 
 interface ConsoleSummaryDisplayProps {
   errorCount: number;
@@ -20,13 +21,15 @@ export const ConsoleSummaryDisplay: React.FC<ConsoleSummaryDisplayProps> = ({
     return null;
   }
 
-  const errorIcon = '\u2716'; // Heavy multiplication x (✖)
-
   return (
-    <Box>
+    <Box
+      aria-label={`${SCREEN_READER_ERROR}${errorCount} error${
+        errorCount !== 1 ? 's' : ''
+      }`}
+    >
       {errorCount > 0 && (
         <Text color={theme.status.error}>
-          {errorIcon} {errorCount} error{errorCount > 1 ? 's' : ''}{' '}
+          {ERROR_ICON} {errorCount} error{errorCount !== 1 ? 's' : ''}{' '}
           <Text color={theme.text.secondary}>(F12 for details)</Text>
         </Text>
       )}
