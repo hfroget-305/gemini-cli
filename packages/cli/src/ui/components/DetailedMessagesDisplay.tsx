@@ -8,6 +8,12 @@ import { useRef, useCallback } from 'react';
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
+import {
+  SCREEN_READER_DEBUG_LABEL,
+  SCREEN_READER_ERROR_LABEL,
+  SCREEN_READER_INFO_LABEL,
+  SCREEN_READER_WARNING_LABEL,
+} from '../textConstants.js';
 import type { ConsoleMessageItem } from '../types.js';
 import {
   ScrollableList,
@@ -75,30 +81,36 @@ export const DetailedMessagesDisplay: React.FC<
           renderItem={({ item: msg }: { item: ConsoleMessageItem }) => {
             let textColor = theme.text.primary;
             let icon = 'ℹ'; // Information source (ℹ)
+            let label = SCREEN_READER_INFO_LABEL;
 
             switch (msg.type) {
               case 'warn':
                 textColor = theme.status.warning;
                 icon = '⚠'; // Warning sign (⚠)
+                label = SCREEN_READER_WARNING_LABEL;
                 break;
               case 'error':
                 textColor = theme.status.error;
                 icon = '✖'; // Heavy multiplication x (✖)
+                label = SCREEN_READER_ERROR_LABEL;
                 break;
               case 'debug':
                 textColor = theme.text.secondary; // Or theme.text.secondary
                 icon = '🔍'; // Left-pointing magnifying glass (🔍)
+                label = SCREEN_READER_DEBUG_LABEL;
                 break;
               case 'log':
               default:
-                // Default textColor and icon are already set
+                // Default textColor, icon and label are already set
                 break;
             }
 
             return (
               <Box flexDirection="row">
                 <Box minWidth={iconBoxWidth} flexShrink={0}>
-                  <Text color={textColor}>{icon}</Text>
+                  <Text color={textColor} aria-label={label}>
+                    {icon}
+                  </Text>
                 </Box>
                 <Text color={textColor} wrap="wrap">
                   {msg.content}
