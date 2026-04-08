@@ -19,6 +19,7 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
+import { SCREEN_READER_CORGI_LABEL } from '../textConstants.js';
 
 export const Footer: React.FC = () => {
   const uiState = useUIState();
@@ -162,7 +163,7 @@ export const Footer: React.FC = () => {
           <Box alignItems="center">
             {corgiMode && (
               <Box paddingLeft={1} flexDirection="row">
-                <Text>
+                <Text aria-label={SCREEN_READER_CORGI_LABEL}>
                   <Text color={theme.ui.symbol}>| </Text>
                   <Text color={theme.status.error}>▼</Text>
                   <Text color={theme.text.primary}>(´</Text>

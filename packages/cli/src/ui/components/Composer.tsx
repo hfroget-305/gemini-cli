@@ -13,6 +13,7 @@ import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
 import { RawMarkdownIndicator } from './RawMarkdownIndicator.js';
 import { InputPrompt } from './InputPrompt.js';
+import { SCREEN_READER_SYSTEM_INSTRUCTIONS_LABEL } from '../textConstants.js';
 import { Footer } from './Footer.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
@@ -93,7 +94,12 @@ export const Composer = () => {
       >
         <Box marginRight={1}>
           {process.env['GEMINI_SYSTEM_MD'] && (
-            <Text color={theme.status.error}>|⌐■_■| </Text>
+            <Text
+              color={theme.status.error}
+              aria-label={SCREEN_READER_SYSTEM_INSTRUCTIONS_LABEL}
+            >
+              |⌐■_■|{' '}
+            </Text>
           )}
           {uiState.ctrlCPressedOnce ? (
             <Text color={theme.status.warning}>

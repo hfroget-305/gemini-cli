@@ -40,7 +40,7 @@ import {
   isSlashCommand,
 } from '../utils/commandUtils.js';
 import * as path from 'node:path';
-import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
+import { SCREEN_READER_HISTORY_SEARCH_PREFIX } from '../textConstants.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { StreamingState } from '../types.js';
@@ -1058,7 +1058,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             reverseSearchActive ? (
               <Text
                 color={theme.text.link}
-                aria-label={SCREEN_READER_USER_PREFIX}
+                aria-label={SCREEN_READER_HISTORY_SEARCH_PREFIX}
               >
                 (r:){' '}
               </Text>
@@ -1066,7 +1066,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               '!'
             )
           ) : commandSearchActive ? (
-            <Text color={theme.text.accent}>(r:) </Text>
+            <Text
+              color={theme.text.accent}
+              aria-label={SCREEN_READER_HISTORY_SEARCH_PREFIX}
+            >
+              (r:){' '}
+            </Text>
           ) : showYoloStyling ? (
             '*'
           ) : (

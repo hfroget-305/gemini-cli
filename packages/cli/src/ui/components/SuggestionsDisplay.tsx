@@ -6,6 +6,10 @@
 
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
+import {
+  SCREEN_READER_SUGGESTIONS_ABOVE_LABEL,
+  SCREEN_READER_SUGGESTIONS_BELOW_LABEL,
+} from '../textConstants.js';
 import { PrepareLabel, MAX_WIDTH } from './PrepareLabel.js';
 import { CommandKind } from '../commands/types.js';
 import { Colors } from '../colors.js';
@@ -71,7 +75,14 @@ export function SuggestionsDisplay({
 
   return (
     <Box flexDirection="column" paddingX={1} width={width}>
-      {scrollOffset > 0 && <Text color={theme.text.primary}>▲</Text>}
+      {scrollOffset > 0 && (
+        <Text
+          color={theme.text.primary}
+          aria-label={SCREEN_READER_SUGGESTIONS_ABOVE_LABEL}
+        >
+          ▲
+        </Text>
+      )}
 
       {visibleSuggestions.map((suggestion, index) => {
         const originalIndex = startIndex + index;
@@ -119,7 +130,11 @@ export function SuggestionsDisplay({
           </Box>
         );
       })}
-      {endIndex < suggestions.length && <Text color="gray">▼</Text>}
+      {endIndex < suggestions.length && (
+        <Text color="gray" aria-label={SCREEN_READER_SUGGESTIONS_BELOW_LABEL}>
+          ▼
+        </Text>
+      )}
       {suggestions.length > MAX_SUGGESTIONS_TO_SHOW && (
         <Text color="gray">
           ({activeIndex + 1}/{suggestions.length})
