@@ -4,15 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useMemo } from 'react';
 import type React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { theme } from '../semantic-colors.js';
 import type { ConsoleMessageItem } from '../types.js';
 import {
   ScrollableList,
   type ScrollableListRef,
 } from './shared/ScrollableList.js';
+import {
+  INFO_ICON,
+  WARNING_ICON,
+  ERROR_ICON,
+  DEBUG_ICON,
+  SCREEN_READER_INFO,
+  SCREEN_READER_WARNING,
+  SCREEN_READER_ERROR,
+  SCREEN_READER_DEBUG,
+} from '../textConstants.js';
 
 interface DetailedMessagesDisplayProps {
   messages: ConsoleMessageItem[];
@@ -21,12 +31,23 @@ interface DetailedMessagesDisplayProps {
   hasFocus: boolean;
 }
 
-const iconBoxWidth = 3;
-
 export const DetailedMessagesDisplay: React.FC<
   DetailedMessagesDisplayProps
 > = ({ messages, maxHeight, width, hasFocus }) => {
   const scrollableListRef = useRef<ScrollableListRef<ConsoleMessageItem>>(null);
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
+
+  const iconBoxWidth = useMemo(() => {
+    if (!isScreenReaderEnabled) {
+      return 3;
+    }
+    return Math.max(
+      SCREEN_READER_INFO.length,
+      SCREEN_READER_WARNING.length,
+      SCREEN_READER_ERROR.length,
+      SCREEN_READER_DEBUG.length,
+    );
+  }, [isScreenReaderEnabled]);
 
   const borderAndPadding = 3;
 
@@ -43,7 +64,7 @@ export const DetailedMessagesDisplay: React.FC<
       const lines = Math.ceil((msg.content?.length || 1) / textWidth);
       return Math.max(1, lines);
     },
-    [width, messages],
+    [width, messages, iconBoxWidth],
   );
 
   if (messages.length === 0) {
@@ -74,20 +95,26 @@ export const DetailedMessagesDisplay: React.FC<
           data={messages}
           renderItem={({ item: msg }: { item: ConsoleMessageItem }) => {
             let textColor = theme.text.primary;
-            let icon = 'ℹ'; // Information source (ℹ)
+            let icon = isScreenReaderEnabled ? SCREEN_READER_INFO : INFO_ICON;
 
             switch (msg.type) {
               case 'warn':
                 textColor = theme.status.warning;
-                icon = '⚠'; // Warning sign (⚠)
+                icon = isScreenReaderEnabled
+                  ? SCREEN_READER_WARNING
+                  : WARNING_ICON;
                 break;
               case 'error':
                 textColor = theme.status.error;
-                icon = '✖'; // Heavy multiplication x (✖)
+                icon = isScreenReaderEnabled
+                  ? SCREEN_READER_ERROR
+                  : ERROR_ICON;
                 break;
               case 'debug':
-                textColor = theme.text.secondary; // Or theme.text.secondary
-                icon = '🔍'; // Left-pointing magnifying glass (🔍)
+                textColor = theme.text.secondary;
+                icon = isScreenReaderEnabled
+                  ? SCREEN_READER_DEBUG
+                  : DEBUG_ICON;
                 break;
               case 'log':
               default:
