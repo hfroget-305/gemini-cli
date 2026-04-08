@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Text, Box } from 'ink';
+import { Text, Box, useIsScreenReaderEnabled } from 'ink';
 import { theme } from '../../semantic-colors.js';
 
 interface ErrorMessageProps {
@@ -13,12 +13,12 @@ interface ErrorMessageProps {
 }
 
 export const ErrorMessage: React.FC<ErrorMessageProps> = ({ text }) => {
-  const prefix = '✕ ';
-  const prefixWidth = prefix.length;
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
+  const prefix = isScreenReaderEnabled ? '[error] ' : '✖ ';
 
   return (
     <Box flexDirection="row" marginBottom={1}>
-      <Box width={prefixWidth}>
+      <Box flexShrink={0}>
         <Text color={theme.status.error}>{prefix}</Text>
       </Box>
       <Box flexGrow={1}>
