@@ -6,8 +6,14 @@
 
 import { useRef, useCallback } from 'react';
 import type React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { theme } from '../semantic-colors.js';
+import {
+  SCREEN_READER_INFO,
+  SCREEN_READER_WARNING,
+  SCREEN_READER_ERROR,
+  SCREEN_READER_DEBUG,
+} from '../textConstants.js';
 import type { ConsoleMessageItem } from '../types.js';
 import {
   ScrollableList,
@@ -22,11 +28,17 @@ interface DetailedMessagesDisplayProps {
 }
 
 const iconBoxWidth = 3;
+const screenReaderIconBoxWidth = 10;
 
 export const DetailedMessagesDisplay: React.FC<
   DetailedMessagesDisplayProps
 > = ({ messages, maxHeight, width, hasFocus }) => {
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
   const scrollableListRef = useRef<ScrollableListRef<ConsoleMessageItem>>(null);
+
+  const currentIconBoxWidth = isScreenReaderEnabled
+    ? screenReaderIconBoxWidth
+    : iconBoxWidth;
 
   const borderAndPadding = 3;
 
@@ -36,14 +48,14 @@ export const DetailedMessagesDisplay: React.FC<
       if (!msg) {
         return 1;
       }
-      const textWidth = width - borderAndPadding - iconBoxWidth;
+      const textWidth = width - borderAndPadding - currentIconBoxWidth;
       if (textWidth <= 0) {
         return 1;
       }
       const lines = Math.ceil((msg.content?.length || 1) / textWidth);
       return Math.max(1, lines);
     },
-    [width, messages],
+    [width, messages, currentIconBoxWidth],
   );
 
   if (messages.length === 0) {
@@ -74,20 +86,20 @@ export const DetailedMessagesDisplay: React.FC<
           data={messages}
           renderItem={({ item: msg }: { item: ConsoleMessageItem }) => {
             let textColor = theme.text.primary;
-            let icon = 'ℹ'; // Information source (ℹ)
+            let icon = isScreenReaderEnabled ? SCREEN_READER_INFO : 'ℹ'; // Information source (ℹ)
 
             switch (msg.type) {
               case 'warn':
                 textColor = theme.status.warning;
-                icon = '⚠'; // Warning sign (⚠)
+                icon = isScreenReaderEnabled ? SCREEN_READER_WARNING : '⚠'; // Warning sign (⚠)
                 break;
               case 'error':
                 textColor = theme.status.error;
-                icon = '✖'; // Heavy multiplication x (✖)
+                icon = isScreenReaderEnabled ? SCREEN_READER_ERROR : '✖'; // Heavy multiplication x (✖)
                 break;
               case 'debug':
                 textColor = theme.text.secondary; // Or theme.text.secondary
-                icon = '🔍'; // Left-pointing magnifying glass (🔍)
+                icon = isScreenReaderEnabled ? SCREEN_READER_DEBUG : '🔍'; // Left-pointing magnifying glass (🔍)
                 break;
               case 'log':
               default:
@@ -97,7 +109,7 @@ export const DetailedMessagesDisplay: React.FC<
 
             return (
               <Box flexDirection="row">
-                <Box minWidth={iconBoxWidth} flexShrink={0}>
+                <Box minWidth={currentIconBoxWidth} flexShrink={0}>
                   <Text color={textColor}>{icon}</Text>
                 </Box>
                 <Text color={textColor} wrap="wrap">
