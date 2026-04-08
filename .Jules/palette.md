@@ -1,0 +1,3 @@
+## 2025-05-22 - [CLI Discoverability and Accessibility]
+**Learning:** In terminal-based UIs (Ink), placeholders and status labels are critical for both discovery and accessibility. Slash commands are often hidden features, and adding them to the placeholder significantly improves discoverability. Furthermore, ensuring the prompt prefix has a descriptive aria-label (e.g., "Prompt", "History search") is essential for screen reader users to understand the current input context.
+**Action:** Always check if core CLI features (like slash commands or shell mode) are hinted at in the initial prompt or placeholder, and ensure all input states have corresponding descriptive labels.

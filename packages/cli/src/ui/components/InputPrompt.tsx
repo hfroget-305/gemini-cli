@@ -112,7 +112,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   config,
   slashCommands,
   commandContext,
-  placeholder = '  Type your message or @path/to/file',
+  placeholder = '  Type your message, /command or @path/to/file',
   focus = true,
   inputWidth,
   suggestionsWidth,
@@ -1001,8 +1001,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     !shellModeActive && approvalMode === ApprovalMode.YOLO;
 
   let statusColor: string | undefined;
-  let statusText = '';
-  if (shellModeActive) {
+  let statusText = 'Prompt';
+  if (reverseSearchActive || commandSearchActive) {
+    statusText = 'History search';
+  } else if (shellModeActive) {
     statusColor = theme.ui.symbol;
     statusText = 'Shell mode';
   } else if (showYoloStyling) {
