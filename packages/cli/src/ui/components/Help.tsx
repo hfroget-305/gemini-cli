@@ -184,6 +184,18 @@ export const Help: React.FC<Help> = ({ commands }) => (
       </Text>{' '}
       - Cycle through your prompt history
     </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        Ctrl+R
+      </Text>{' '}
+      - Search history
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        Ctrl+A / Ctrl+E
+      </Text>{' '}
+      - Move cursor to start / end of line
+    </Text>
     <Box height={1} />
     <Text color={theme.text.primary}>
       For a full list of shortcuts, see{' '}
