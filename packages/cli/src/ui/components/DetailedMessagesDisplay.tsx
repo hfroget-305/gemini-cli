@@ -4,15 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useMemo } from 'react';
 import type React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { theme } from '../semantic-colors.js';
 import type { ConsoleMessageItem } from '../types.js';
 import {
   ScrollableList,
   type ScrollableListRef,
 } from './shared/ScrollableList.js';
+import {
+  INFO_ICON,
+  WARNING_ICON,
+  ERROR_ICON,
+  DEBUG_ICON,
+  SCREEN_READER_INFO,
+  SCREEN_READER_WARNING,
+  SCREEN_READER_ERROR,
+  SCREEN_READER_DEBUG,
+} from '../textConstants.js';
 
 interface DetailedMessagesDisplayProps {
   messages: ConsoleMessageItem[];
@@ -21,12 +31,55 @@ interface DetailedMessagesDisplayProps {
   hasFocus: boolean;
 }
 
-const iconBoxWidth = 3;
-
 export const DetailedMessagesDisplay: React.FC<
   DetailedMessagesDisplayProps
 > = ({ messages, maxHeight, width, hasFocus }) => {
   const scrollableListRef = useRef<ScrollableListRef<ConsoleMessageItem>>(null);
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
+
+  const getPrefix = useCallback(
+    (type: ConsoleMessageItem['type']) => {
+      if (isScreenReaderEnabled) {
+        switch (type) {
+          case 'warn':
+            return SCREEN_READER_WARNING;
+          case 'error':
+            return SCREEN_READER_ERROR;
+          case 'debug':
+            return SCREEN_READER_DEBUG;
+          case 'log':
+          default:
+            return SCREEN_READER_INFO;
+        }
+      } else {
+        switch (type) {
+          case 'warn':
+            return `${WARNING_ICON} `;
+          case 'error':
+            return `${ERROR_ICON} `;
+          case 'debug':
+            return `${DEBUG_ICON} `;
+          case 'log':
+          default:
+            return `${INFO_ICON} `;
+        }
+      }
+    },
+    [isScreenReaderEnabled],
+  );
+
+  const iconBoxWidth = useMemo(() => {
+    if (!isScreenReaderEnabled) {
+      return 3;
+    }
+    // Length of the longest screen reader prefix
+    return Math.max(
+      SCREEN_READER_INFO.length,
+      SCREEN_READER_WARNING.length,
+      SCREEN_READER_ERROR.length,
+      SCREEN_READER_DEBUG.length,
+    );
+  }, [isScreenReaderEnabled]);
 
   const borderAndPadding = 3;
 
@@ -43,7 +96,7 @@ export const DetailedMessagesDisplay: React.FC<
       const lines = Math.ceil((msg.content?.length || 1) / textWidth);
       return Math.max(1, lines);
     },
-    [width, messages],
+    [width, messages, iconBoxWidth],
   );
 
   if (messages.length === 0) {
@@ -74,31 +127,27 @@ export const DetailedMessagesDisplay: React.FC<
           data={messages}
           renderItem={({ item: msg }: { item: ConsoleMessageItem }) => {
             let textColor = theme.text.primary;
-            let icon = 'ℹ'; // Information source (ℹ)
+            const prefix = getPrefix(msg.type);
 
             switch (msg.type) {
               case 'warn':
                 textColor = theme.status.warning;
-                icon = '⚠'; // Warning sign (⚠)
                 break;
               case 'error':
                 textColor = theme.status.error;
-                icon = '✖'; // Heavy multiplication x (✖)
                 break;
               case 'debug':
-                textColor = theme.text.secondary; // Or theme.text.secondary
-                icon = '🔍'; // Left-pointing magnifying glass (🔍)
+                textColor = theme.text.secondary;
                 break;
               case 'log':
               default:
-                // Default textColor and icon are already set
                 break;
             }
 
             return (
               <Box flexDirection="row">
-                <Box minWidth={iconBoxWidth} flexShrink={0}>
-                  <Text color={textColor}>{icon}</Text>
+                <Box width={iconBoxWidth} flexShrink={0}>
+                  <Text color={textColor}>{prefix}</Text>
                 </Box>
                 <Text color={textColor} wrap="wrap">
                   {msg.content}
