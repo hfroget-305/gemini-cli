@@ -138,6 +138,12 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
+        Ctrl+R
+      </Text>{' '}
+      - Search command history
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
         Ctrl+S
       </Text>{' '}
       - Enter selection mode to copy text
