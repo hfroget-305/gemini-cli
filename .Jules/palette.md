@@ -1,0 +1,3 @@
+## 2025-05-15 - [CLI Accessibility: Screen Reader Descriptive Prefixes]
+**Learning:** In terminal UIs built with Ink, icons like ✖ or ⚠ provide critical status context that is often lost on screen readers. While `aria-label` is supported, terminal screen readers are more reliable when presented with explicit text prefixes. The `useIsScreenReaderEnabled` hook allows for conditional rendering of these descriptive prefixes (e.g., swapping ✖ for '[error] ') without compromising the visual experience for other users.
+**Action:** Always use `useIsScreenReaderEnabled` to provide textual fallbacks or descriptive prefixes for visual-only status indicators in the CLI.
