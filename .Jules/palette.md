@@ -1,0 +1,3 @@
+## 2025-03-13 - [Terminal Accessibility Patterns]
+**Learning:** In terminal-based UIs using Ink, `aria-label` on visual-only icons (like emojis or Unicode symbols) is not consistently announced by all screen readers. A more robust pattern is to conditionally render descriptive text prefixes (e.g., swapping "⚠" for "[warning] ") using the `useIsScreenReaderEnabled` hook.
+**Action:** When adding textual prefixes for accessibility, always dynamically recalculate layout constants (like `iconBoxWidth` or `estimatedItemHeight`) and ensure these are tracked in hook dependency arrays to maintain correct UI alignment and scrolling behavior.
