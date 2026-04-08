@@ -162,7 +162,7 @@ export const Footer: React.FC = () => {
           <Box alignItems="center">
             {corgiMode && (
               <Box paddingLeft={1} flexDirection="row">
-                <Text>
+                <Text aria-label="Corgi">
                   <Text color={theme.ui.symbol}>| </Text>
                   <Text color={theme.status.error}>▼</Text>
                   <Text color={theme.text.primary}>(´</Text>
