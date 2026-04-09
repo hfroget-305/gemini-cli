@@ -7,6 +7,7 @@
 import type React from 'react';
 import { Text, Box } from 'ink';
 import { theme } from '../../semantic-colors.js';
+import { SCREEN_READER_INFO } from '../../textConstants.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 
 interface InfoMessageProps {
@@ -27,7 +28,9 @@ export const InfoMessage: React.FC<InfoMessageProps> = ({
   return (
     <Box flexDirection="row" marginTop={1}>
       <Box width={prefixWidth}>
-        <Text color={color}>{prefix}</Text>
+        <Text color={color} aria-label={SCREEN_READER_INFO}>
+          {prefix}
+        </Text>
       </Box>
       <Box flexGrow={1} flexDirection="column">
         {text.split('\n').map((line, index) => (
