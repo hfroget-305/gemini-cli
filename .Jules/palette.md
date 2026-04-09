@@ -1,0 +1,3 @@
+## 2025-05-15 - Screen Reader Accessibility in Ink CLI
+**Learning:** For terminal-based applications using the Ink framework (specifically the @jrichman/ink fork), visual-only status icons like ℹ, ⚠, and ✖ are not automatically accessible to screen readers. While Ink supports the `aria-label` attribute on `Text` and `Box` components to provide semantic meaning, it's often more reliable to provide a textual prefix or replacement (e.g., '[warning] ') when a screen reader is detected.
+**Action:** Use the `useIsScreenReaderEnabled` hook from `ink` to conditionally render descriptive text prefixes for visual-only status icons, and ensure these labels are centralized in a common file like `textConstants.ts` for consistency.
