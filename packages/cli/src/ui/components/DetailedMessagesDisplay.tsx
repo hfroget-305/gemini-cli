@@ -13,6 +13,12 @@ import {
   ScrollableList,
   type ScrollableListRef,
 } from './shared/ScrollableList.js';
+import {
+  SCREEN_READER_INFO_ICON,
+  SCREEN_READER_WARNING_ICON,
+  SCREEN_READER_ERROR_ICON,
+  SCREEN_READER_DEBUG_ICON,
+} from '../textConstants.js';
 
 interface DetailedMessagesDisplayProps {
   messages: ConsoleMessageItem[];
@@ -75,30 +81,36 @@ export const DetailedMessagesDisplay: React.FC<
           renderItem={({ item: msg }: { item: ConsoleMessageItem }) => {
             let textColor = theme.text.primary;
             let icon = 'ℹ'; // Information source (ℹ)
+            let iconLabel = SCREEN_READER_INFO_ICON;
 
             switch (msg.type) {
               case 'warn':
                 textColor = theme.status.warning;
                 icon = '⚠'; // Warning sign (⚠)
+                iconLabel = SCREEN_READER_WARNING_ICON;
                 break;
               case 'error':
                 textColor = theme.status.error;
                 icon = '✖'; // Heavy multiplication x (✖)
+                iconLabel = SCREEN_READER_ERROR_ICON;
                 break;
               case 'debug':
                 textColor = theme.text.secondary; // Or theme.text.secondary
                 icon = '🔍'; // Left-pointing magnifying glass (🔍)
+                iconLabel = SCREEN_READER_DEBUG_ICON;
                 break;
               case 'log':
               default:
-                // Default textColor and icon are already set
+                // Default textColor, icon and iconLabel are already set
                 break;
             }
 
             return (
               <Box flexDirection="row">
                 <Box minWidth={iconBoxWidth} flexShrink={0}>
-                  <Text color={textColor}>{icon}</Text>
+                  <Text color={textColor} aria-label={iconLabel}>
+                    {icon}
+                  </Text>
                 </Box>
                 <Text color={textColor} wrap="wrap">
                   {msg.content}

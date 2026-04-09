@@ -29,6 +29,7 @@ import { ApprovalMode } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
+import { SCREEN_READER_SYSTEM_INDICATOR } from '../textConstants.js';
 
 export const Composer = () => {
   const config = useConfig();
@@ -93,7 +94,12 @@ export const Composer = () => {
       >
         <Box marginRight={1}>
           {process.env['GEMINI_SYSTEM_MD'] && (
-            <Text color={theme.status.error}>|⌐■_■| </Text>
+            <Text
+              color={theme.status.error}
+              aria-label={SCREEN_READER_SYSTEM_INDICATOR}
+            >
+              |⌐■_■|{' '}
+            </Text>
           )}
           {uiState.ctrlCPressedOnce ? (
             <Text color={theme.status.warning}>
