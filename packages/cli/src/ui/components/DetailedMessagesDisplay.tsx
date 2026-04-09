@@ -6,9 +6,10 @@
 
 import { useRef, useCallback } from 'react';
 import type React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { theme } from '../semantic-colors.js';
 import type { ConsoleMessageItem } from '../types.js';
+import { SCREEN_READER_PREFIXES } from '../textConstants.js';
 import {
   ScrollableList,
   type ScrollableListRef,
@@ -21,11 +22,10 @@ interface DetailedMessagesDisplayProps {
   hasFocus: boolean;
 }
 
-const iconBoxWidth = 3;
-
 export const DetailedMessagesDisplay: React.FC<
   DetailedMessagesDisplayProps
 > = ({ messages, maxHeight, width, hasFocus }) => {
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
   const scrollableListRef = useRef<ScrollableListRef<ConsoleMessageItem>>(null);
 
   const borderAndPadding = 3;
@@ -36,14 +36,19 @@ export const DetailedMessagesDisplay: React.FC<
       if (!msg) {
         return 1;
       }
-      const textWidth = width - borderAndPadding - iconBoxWidth;
+
+      const prefixWidth = isScreenReaderEnabled
+        ? SCREEN_READER_PREFIXES[msg.type || 'log'].length
+        : 3;
+
+      const textWidth = width - borderAndPadding - prefixWidth;
       if (textWidth <= 0) {
         return 1;
       }
       const lines = Math.ceil((msg.content?.length || 1) / textWidth);
       return Math.max(1, lines);
     },
-    [width, messages],
+    [width, messages, isScreenReaderEnabled],
   );
 
   if (messages.length === 0) {
@@ -74,31 +79,39 @@ export const DetailedMessagesDisplay: React.FC<
           data={messages}
           renderItem={({ item: msg }: { item: ConsoleMessageItem }) => {
             let textColor = theme.text.primary;
-            let icon = 'ℹ'; // Information source (ℹ)
+            let iconOrPrefix: string = 'ℹ'; // Information source (ℹ)
 
             switch (msg.type) {
               case 'warn':
                 textColor = theme.status.warning;
-                icon = '⚠'; // Warning sign (⚠)
+                iconOrPrefix = isScreenReaderEnabled
+                  ? SCREEN_READER_PREFIXES.warn
+                  : '⚠';
                 break;
               case 'error':
                 textColor = theme.status.error;
-                icon = '✖'; // Heavy multiplication x (✖)
+                iconOrPrefix = isScreenReaderEnabled
+                  ? SCREEN_READER_PREFIXES.error
+                  : '✖';
                 break;
               case 'debug':
-                textColor = theme.text.secondary; // Or theme.text.secondary
-                icon = '🔍'; // Left-pointing magnifying glass (🔍)
+                textColor = theme.text.secondary;
+                iconOrPrefix = isScreenReaderEnabled
+                  ? SCREEN_READER_PREFIXES.debug
+                  : '🔍';
                 break;
               case 'log':
               default:
-                // Default textColor and icon are already set
+                iconOrPrefix = isScreenReaderEnabled
+                  ? SCREEN_READER_PREFIXES.log
+                  : 'ℹ';
                 break;
             }
 
             return (
               <Box flexDirection="row">
-                <Box minWidth={iconBoxWidth} flexShrink={0}>
-                  <Text color={textColor}>{icon}</Text>
+                <Box minWidth={isScreenReaderEnabled ? 0 : 3} flexShrink={0}>
+                  <Text color={textColor}>{iconOrPrefix}</Text>
                 </Box>
                 <Text color={textColor} wrap="wrap">
                   {msg.content}

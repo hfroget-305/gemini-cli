@@ -6,10 +6,18 @@
 
 import { render } from '../../test-utils/render.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, type Mock, beforeEach } from 'vitest';
 import type { ConsoleMessageItem } from '../types.js';
-import { Box } from 'ink';
+import { Box, useIsScreenReaderEnabled } from 'ink';
 import type React from 'react';
+
+vi.mock('ink', async () => {
+  const actual = await vi.importActual('ink');
+  return {
+    ...actual,
+    useIsScreenReaderEnabled: vi.fn(),
+  };
+});
 
 vi.mock('./shared/ScrollableList.js', () => ({
   ScrollableList: ({
@@ -28,6 +36,10 @@ vi.mock('./shared/ScrollableList.js', () => ({
 }));
 
 describe('DetailedMessagesDisplay', () => {
+  beforeEach(() => {
+    (useIsScreenReaderEnabled as Mock).mockReturnValue(false);
+  });
+
   it('renders nothing when messages are empty', () => {
     const { lastFrame } = render(
       <DetailedMessagesDisplay
@@ -77,5 +89,31 @@ describe('DetailedMessagesDisplay', () => {
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
+  });
+
+  it('renders descriptive prefixes when screen reader is enabled', () => {
+    (useIsScreenReaderEnabled as Mock).mockReturnValue(true);
+
+    const messages: ConsoleMessageItem[] = [
+      { type: 'log', content: 'Log message', count: 1 },
+      { type: 'warn', content: 'Warning message', count: 1 },
+      { type: 'error', content: 'Error message', count: 1 },
+      { type: 'debug', content: 'Debug message', count: 1 },
+    ];
+
+    const { lastFrame } = render(
+      <DetailedMessagesDisplay
+        messages={messages}
+        maxHeight={20}
+        width={80}
+        hasFocus={true}
+      />,
+    );
+    const output = lastFrame();
+
+    expect(output).toContain('[info] Log message');
+    expect(output).toContain('[warning] Warning message');
+    expect(output).toContain('[error] Error message');
+    expect(output).toContain('[debug] Debug message');
   });
 });
