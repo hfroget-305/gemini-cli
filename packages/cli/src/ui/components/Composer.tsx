@@ -93,7 +93,12 @@ export const Composer = () => {
       >
         <Box marginRight={1}>
           {process.env['GEMINI_SYSTEM_MD'] && (
-            <Text color={theme.status.error}>|⌐■_■| </Text>
+            <Text
+              color={theme.status.error}
+              aria-label="System instructions active"
+            >
+              {isScreenReaderEnabled ? '[system active] ' : '|⌐■_■| '}
+            </Text>
           )}
           {uiState.ctrlCPressedOnce ? (
             <Text color={theme.status.warning}>

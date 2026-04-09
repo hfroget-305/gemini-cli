@@ -1,0 +1,3 @@
+## 2026-03-15 - Standardized Screen Reader Prefixes for Terminal Icons
+**Learning:** Terminal screen readers may not consistently process `aria-label` on `Text` or `Box` components in Ink. For critical status information conveyed via icons (like info, warning, error), conditional rendering using `useIsScreenReaderEnabled` to provide textual prefixes (e.g., swapping '⚠' for '[warning] ') is a more reliable pattern for terminal accessibility.
+**Action:** Always provide textual fallbacks for visual-only status icons using `useIsScreenReaderEnabled` and ensure layout constants (like box widths for alignment) are updated to accommodate the increased length of textual prefixes.
