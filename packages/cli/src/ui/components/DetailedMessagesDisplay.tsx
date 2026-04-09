@@ -8,6 +8,12 @@ import { useRef, useCallback } from 'react';
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
+import {
+  SCREEN_READER_DEBUG,
+  SCREEN_READER_ERROR,
+  SCREEN_READER_INFO,
+  SCREEN_READER_WARNING,
+} from '../textConstants.js';
 import type { ConsoleMessageItem } from '../types.js';
 import {
   ScrollableList,
@@ -75,19 +81,23 @@ export const DetailedMessagesDisplay: React.FC<
           renderItem={({ item: msg }: { item: ConsoleMessageItem }) => {
             let textColor = theme.text.primary;
             let icon = 'ℹ'; // Information source (ℹ)
+            let ariaLabel = SCREEN_READER_INFO;
 
             switch (msg.type) {
               case 'warn':
                 textColor = theme.status.warning;
                 icon = '⚠'; // Warning sign (⚠)
+                ariaLabel = SCREEN_READER_WARNING;
                 break;
               case 'error':
                 textColor = theme.status.error;
                 icon = '✖'; // Heavy multiplication x (✖)
+                ariaLabel = SCREEN_READER_ERROR;
                 break;
               case 'debug':
                 textColor = theme.text.secondary; // Or theme.text.secondary
                 icon = '🔍'; // Left-pointing magnifying glass (🔍)
+                ariaLabel = SCREEN_READER_DEBUG;
                 break;
               case 'log':
               default:
@@ -98,7 +108,9 @@ export const DetailedMessagesDisplay: React.FC<
             return (
               <Box flexDirection="row">
                 <Box minWidth={iconBoxWidth} flexShrink={0}>
-                  <Text color={textColor}>{icon}</Text>
+                  <Text color={textColor} aria-label={ariaLabel}>
+                    {icon}
+                  </Text>
                 </Box>
                 <Text color={textColor} wrap="wrap">
                   {msg.content}
