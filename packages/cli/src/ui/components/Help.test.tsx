@@ -71,4 +71,15 @@ describe('Help Component', () => {
     expect(output).toContain('Page Up/Down');
     unmount();
   });
+
+  it('should render newly added keyboard shortcuts', () => {
+    const { lastFrame, unmount } = render(<Help commands={mockCommands} />);
+    const output = lastFrame();
+
+    expect(output).toContain('Ctrl+A / Ctrl+E');
+    expect(output).toContain('Ctrl+R');
+    expect(output).toContain('Ctrl+U / Ctrl+W');
+    expect(output).toContain('Up/Down / Ctrl+P/N');
+    unmount();
+  });
 });
