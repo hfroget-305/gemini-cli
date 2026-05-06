@@ -6,6 +6,12 @@
 
 import { useState } from 'react';
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
+import {
+  WARNING_ICON,
+  ERROR_ICON,
+  SCREEN_READER_WARNING,
+  SCREEN_READER_ERROR,
+} from '../textConstants.js';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
 import { AutoAcceptIndicator } from './AutoAcceptIndicator.js';
@@ -29,6 +35,28 @@ import { ApprovalMode } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
+
+const StatusMessage = ({
+  icon,
+  srPrefix,
+  color,
+  message,
+}: {
+  icon: string;
+  srPrefix: string;
+  color: string;
+  message: string;
+}) => {
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
+  return (
+    <Box flexDirection="row">
+      <Box width={isScreenReaderEnabled ? 11 : 3} flexShrink={0}>
+        <Text color={color}>{isScreenReaderEnabled ? srPrefix : icon}</Text>
+      </Box>
+      <Text color={color}>{message}</Text>
+    </Box>
+  );
+};
 
 export const Composer = () => {
   const config = useConfig();
@@ -96,19 +124,40 @@ export const Composer = () => {
             <Text color={theme.status.error}>|⌐■_■| </Text>
           )}
           {uiState.ctrlCPressedOnce ? (
-            <Text color={theme.status.warning}>
-              Press Ctrl+C again to exit.
-            </Text>
+            <StatusMessage
+              icon={WARNING_ICON}
+              srPrefix={SCREEN_READER_WARNING}
+              color={theme.status.warning}
+              message="Press Ctrl+C again to exit."
+            />
           ) : uiState.warningMessage ? (
-            <Text color={theme.status.warning}>{uiState.warningMessage}</Text>
+            <StatusMessage
+              icon={WARNING_ICON}
+              srPrefix={SCREEN_READER_WARNING}
+              color={theme.status.warning}
+              message={uiState.warningMessage}
+            />
           ) : uiState.ctrlDPressedOnce ? (
-            <Text color={theme.status.warning}>
-              Press Ctrl+D again to exit.
-            </Text>
+            <StatusMessage
+              icon={WARNING_ICON}
+              srPrefix={SCREEN_READER_WARNING}
+              color={theme.status.warning}
+              message="Press Ctrl+D again to exit."
+            />
           ) : uiState.showEscapePrompt ? (
-            <Text color={theme.text.secondary}>Press Esc again to clear.</Text>
+            <StatusMessage
+              icon={WARNING_ICON}
+              srPrefix={SCREEN_READER_WARNING}
+              color={theme.text.secondary}
+              message="Press Esc again to clear."
+            />
           ) : uiState.queueErrorMessage ? (
-            <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>
+            <StatusMessage
+              icon={ERROR_ICON}
+              srPrefix={SCREEN_READER_ERROR}
+              color={theme.status.error}
+              message={uiState.queueErrorMessage}
+            />
           ) : (
             !settings.merged.ui?.hideContextSummary &&
             !hideContextSummary && (
