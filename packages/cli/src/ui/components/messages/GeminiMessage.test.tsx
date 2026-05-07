@@ -7,6 +7,16 @@
 import { GeminiMessage } from './GeminiMessage.js';
 import { StreamingState } from '../../types.js';
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { describe, it, expect, vi } from 'vitest';
+import { useIsScreenReaderEnabled } from 'ink';
+
+vi.mock('ink', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('ink')>();
+  return {
+    ...actual,
+    useIsScreenReaderEnabled: vi.fn(),
+  };
+});
 
 describe('<GeminiMessage /> - Raw Markdown Display Snapshots', () => {
   const baseProps = {
@@ -46,4 +56,16 @@ describe('<GeminiMessage /> - Raw Markdown Display Snapshots', () => {
       expect(lastFrame()).toMatchSnapshot();
     },
   );
+
+  it('renders with screen reader prefix when enabled', () => {
+    vi.mocked(useIsScreenReaderEnabled).mockReturnValue(true);
+    const { lastFrame } = renderWithProviders(
+      <GeminiMessage {...baseProps} />,
+      {
+        uiState: { renderMarkdown: true, streamingState: StreamingState.Idle },
+      },
+    );
+    expect(lastFrame()).toContain('Model: ');
+    expect(lastFrame()).not.toContain('✦');
+  });
 });
