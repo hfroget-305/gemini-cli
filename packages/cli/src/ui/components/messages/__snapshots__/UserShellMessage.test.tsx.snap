@@ -1,0 +1,7 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`UserShellMessage > removes leading ! from command 1`] = `"$ echo hello"`;
+
+exports[`UserShellMessage > renders normal shell message with default prefix 1`] = `"$ ls -la"`;
+
+exports[`UserShellMessage > renders shell message with screen reader prefix when enabled 1`] = `"[shell] pwd"`;
