@@ -153,6 +153,59 @@ If any of the three has access to:
 I will produce a detailed per-node review of W1/W2/W3 once they have MCP
 access enabled.
 
+### 2b. Three more autonomous agents — Supervisor / Sales / OPS (UNVERIFIED)
+
+The owner has flagged a separate set of three autonomous agents named
+**Supervisor**, **Sales**, and **OPS** that also create or mutate downstream
+agents and must operate under human oversight.
+
+**Visibility gap:** None of the 19 workflows returned by `search_workflows`
+across both projects (`My project`, `Harry Froget <hfroget@gmail.com>`) match
+those names — search queries for `"OPS"`, `"Sales"`, `"Supervisor"` all
+returned zero results. Possibilities:
+
+1. They are **archived** workflows (excluded from the default search
+   response).
+2. They live in a **different n8n instance** than the one this MCP server
+   connects to.
+3. They live in a project/folder the current MCP credential cannot list.
+4. They are **sub-workflows** referenced by one of the visible workflows via
+   `n8n-nodes-langchain.toolWorkflow` — most likely candidates:
+   `4yMbMRvwAPIVsuE4` (TravelCloud AI — Slack Agent Router) or
+   `6Kqgji1W6NEnvuSF` (TravelCloud CS AI — Mercately WhatsApp Agent).
+
+Until the owner regains n8n access, treat these three as **unverified but
+high-risk** and apply the guardrails in §2 (1)–(6) as soon as they can be
+identified. Specifically:
+
+- **Do not let the Supervisor self-spawn**. If it currently has the ability
+  to call `create_workflow_from_code` / `update_workflow` /
+  `publish_workflow` (either via the n8n MCP server or via an `httpRequest`
+  node targeting `/rest/workflows`), strip that capability and replace it
+  with a "draft → human approve → apply" two-step.
+- **Sales** and **OPS** likely each carry write credentials to CRM (Zoho) and
+  ops systems (RingCentral / Mercately / Slack). Their tool lists must be
+  explicit allowlists with the **smallest** scope that works (e.g. Zoho
+  `lead:update` on a single module, never `crm:full`).
+- Add a Slack approval node (or n8n's built-in `Wait` + form trigger) before
+  any tool call that **creates** records or **modifies** other agents'
+  prompts/playbooks.
+
+### Apply-when-unlocked runbook
+
+Once the owner can sign in to n8n:
+
+1. Confirm whether Supervisor / Sales / OPS are real workflows (search the
+   workflow list including archived) or internal nodes inside the Slack /
+   Mercately routers.
+2. For each: toggle **Settings → Available in MCP** ON and reply "go" — I'll
+   run the per-node audit and append §2c.
+3. Apply the `wvq-005` patch from
+   `docs/security/patches/wvq-005-build-queue-report-html.js` to the
+   Verification Queue workflow.
+4. Enable webhook signature verification on the six webhook-receiving
+   workflows in §3.
+
 ---
 
 ## 3. Workflows still pending review (MCP not enabled)
