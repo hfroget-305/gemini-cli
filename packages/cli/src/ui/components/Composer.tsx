@@ -6,6 +6,12 @@
 
 import { useState } from 'react';
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
+import {
+  WARNING_ICON,
+  ERROR_ICON,
+  SCREEN_READER_WARNING,
+  SCREEN_READER_ERROR,
+} from '../textConstants.js';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
 import { AutoAcceptIndicator } from './AutoAcceptIndicator.js';
@@ -95,20 +101,77 @@ export const Composer = () => {
           {process.env['GEMINI_SYSTEM_MD'] && (
             <Text color={theme.status.error}>|⌐■_■| </Text>
           )}
-          {uiState.ctrlCPressedOnce ? (
-            <Text color={theme.status.warning}>
-              Press Ctrl+C again to exit.
-            </Text>
-          ) : uiState.warningMessage ? (
-            <Text color={theme.status.warning}>{uiState.warningMessage}</Text>
-          ) : uiState.ctrlDPressedOnce ? (
-            <Text color={theme.status.warning}>
-              Press Ctrl+D again to exit.
-            </Text>
-          ) : uiState.showEscapePrompt ? (
-            <Text color={theme.text.secondary}>Press Esc again to clear.</Text>
-          ) : uiState.queueErrorMessage ? (
-            <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>
+          {uiState.ctrlCPressedOnce ||
+          uiState.warningMessage ||
+          uiState.ctrlDPressedOnce ||
+          uiState.showEscapePrompt ||
+          uiState.queueErrorMessage ? (
+            <Box flexDirection="row">
+              {uiState.ctrlCPressedOnce ? (
+                <>
+                  <Box width={isScreenReaderEnabled ? 11 : 3} flexShrink={0}>
+                    <Text color={theme.status.warning}>
+                      {isScreenReaderEnabled
+                        ? SCREEN_READER_WARNING
+                        : WARNING_ICON + ' '}
+                    </Text>
+                  </Box>
+                  <Text color={theme.status.warning}>
+                    Press Ctrl+C again to exit.
+                  </Text>
+                </>
+              ) : uiState.warningMessage ? (
+                <>
+                  <Box width={isScreenReaderEnabled ? 11 : 3} flexShrink={0}>
+                    <Text color={theme.status.warning}>
+                      {isScreenReaderEnabled
+                        ? SCREEN_READER_WARNING
+                        : WARNING_ICON + ' '}
+                    </Text>
+                  </Box>
+                  <Text color={theme.status.warning}>
+                    {uiState.warningMessage}
+                  </Text>
+                </>
+              ) : uiState.ctrlDPressedOnce ? (
+                <>
+                  <Box width={isScreenReaderEnabled ? 11 : 3} flexShrink={0}>
+                    <Text color={theme.status.warning}>
+                      {isScreenReaderEnabled
+                        ? SCREEN_READER_WARNING
+                        : WARNING_ICON + ' '}
+                    </Text>
+                  </Box>
+                  <Text color={theme.status.warning}>
+                    Press Ctrl+D again to exit.
+                  </Text>
+                </>
+              ) : uiState.showEscapePrompt ? (
+                <Text
+                  color={theme.text.secondary}
+                  marginLeft={
+                    isScreenReaderEnabled ? 0 : 3 /* align with icons */
+                  }
+                >
+                  Press Esc again to clear.
+                </Text>
+              ) : (
+                uiState.queueErrorMessage && (
+                  <>
+                    <Box width={isScreenReaderEnabled ? 11 : 3} flexShrink={0}>
+                      <Text color={theme.status.error}>
+                        {isScreenReaderEnabled
+                          ? SCREEN_READER_ERROR
+                          : ERROR_ICON + ' '}
+                      </Text>
+                    </Box>
+                    <Text color={theme.status.error}>
+                      {uiState.queueErrorMessage}
+                    </Text>
+                  </>
+                )
+              )}
+            </Box>
           ) : (
             !settings.merged.ui?.hideContextSummary &&
             !hideContextSummary && (
