@@ -6,6 +6,13 @@
 
 import { useState } from 'react';
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
+import {
+  WARNING_ICON,
+  ERROR_ICON,
+  SCREEN_READER_WARNING,
+  SCREEN_READER_ERROR,
+  SCREEN_READER_INFO,
+} from '../textConstants.js';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
 import { AutoAcceptIndicator } from './AutoAcceptIndicator.js';
@@ -34,6 +41,7 @@ export const Composer = () => {
   const config = useConfig();
   const settings = useSettings();
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
+  const iconBoxWidth = isScreenReaderEnabled ? 11 : 3;
   const uiState = useUIState();
   const uiActions = useUIActions();
   const { vimEnabled } = useVimMode();
@@ -47,6 +55,60 @@ export const Composer = () => {
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
   const hideContextSummary =
     suggestionsVisible && suggestionsPosition === 'above';
+
+  const renderTransientStatus = () => {
+    const {
+      ctrlCPressedOnce,
+      warningMessage,
+      ctrlDPressedOnce,
+      showEscapePrompt,
+      queueErrorMessage,
+    } = uiState;
+
+    if (
+      !ctrlCPressedOnce &&
+      !warningMessage &&
+      !ctrlDPressedOnce &&
+      !showEscapePrompt &&
+      !queueErrorMessage
+    ) {
+      return null;
+    }
+
+    let color = theme.status.warning;
+    let icon = WARNING_ICON;
+    let srPrefix = SCREEN_READER_WARNING;
+    let message = '';
+
+    if (queueErrorMessage) {
+      color = theme.status.error;
+      icon = ERROR_ICON;
+      srPrefix = SCREEN_READER_ERROR;
+      message = queueErrorMessage;
+    } else if (showEscapePrompt) {
+      color = theme.text.secondary;
+      icon = '';
+      srPrefix = SCREEN_READER_INFO;
+      message = 'Press Esc again to clear.';
+    } else if (ctrlCPressedOnce) {
+      message = 'Press Ctrl+C again to exit.';
+    } else if (ctrlDPressedOnce) {
+      message = 'Press Ctrl+D again to exit.';
+    } else if (warningMessage) {
+      message = warningMessage;
+    }
+
+    return (
+      <Box flexDirection="row">
+        <Box width={iconBoxWidth} flexShrink={0}>
+          <Text color={color}>
+            {isScreenReaderEnabled ? srPrefix : icon}
+          </Text>
+        </Box>
+        <Text color={color}>{message}</Text>
+      </Box>
+    );
+  };
 
   return (
     <Box
@@ -91,24 +153,16 @@ export const Composer = () => {
         flexDirection={isNarrow ? 'column' : 'row'}
         alignItems={isNarrow ? 'flex-start' : 'center'}
       >
-        <Box marginRight={1}>
+        <Box marginRight={1} flexDirection="row">
           {process.env['GEMINI_SYSTEM_MD'] && (
             <Text color={theme.status.error}>|⌐■_■| </Text>
           )}
-          {uiState.ctrlCPressedOnce ? (
-            <Text color={theme.status.warning}>
-              Press Ctrl+C again to exit.
-            </Text>
-          ) : uiState.warningMessage ? (
-            <Text color={theme.status.warning}>{uiState.warningMessage}</Text>
-          ) : uiState.ctrlDPressedOnce ? (
-            <Text color={theme.status.warning}>
-              Press Ctrl+D again to exit.
-            </Text>
-          ) : uiState.showEscapePrompt ? (
-            <Text color={theme.text.secondary}>Press Esc again to clear.</Text>
-          ) : uiState.queueErrorMessage ? (
-            <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>
+          {uiState.ctrlCPressedOnce ||
+          uiState.warningMessage ||
+          uiState.ctrlDPressedOnce ||
+          uiState.showEscapePrompt ||
+          uiState.queueErrorMessage ? (
+            renderTransientStatus()
           ) : (
             !settings.merged.ui?.hideContextSummary &&
             !hideContextSummary && (
