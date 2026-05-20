@@ -19,16 +19,69 @@ import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { theme } from '../semantic-colors.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
-import { useUIState } from '../contexts/UIStateContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { ApprovalMode } from '@google/gemini-cli-core';
+import { type UIState, useUIState } from '../contexts/UIStateContext.js';
 import { StreamingState } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
+import {
+  INFO_ICON,
+  WARNING_ICON,
+  ERROR_ICON,
+  SCREEN_READER_INFO,
+  SCREEN_READER_WARNING,
+  SCREEN_READER_ERROR,
+} from '../textConstants.js';
+
+const TransientStatus = ({
+  uiState,
+  isScreenReaderEnabled,
+}: {
+  uiState: UIState;
+  isScreenReaderEnabled: boolean;
+}) => {
+  let text = '';
+  let color = theme.status.warning;
+  let icon = WARNING_ICON;
+  let srPrefix = SCREEN_READER_WARNING;
+
+  if (uiState.ctrlCPressedOnce) {
+    text = 'Press Ctrl+C again to exit.';
+  } else if (uiState.warningMessage) {
+    text = uiState.warningMessage;
+  } else if (uiState.ctrlDPressedOnce) {
+    text = 'Press Ctrl+D again to exit.';
+  } else if (uiState.showEscapePrompt) {
+    text = 'Press Esc again to clear.';
+    color = theme.text.secondary;
+    icon = INFO_ICON;
+    srPrefix = SCREEN_READER_INFO;
+  } else if (uiState.queueErrorMessage) {
+    text = uiState.queueErrorMessage;
+    color = theme.status.error;
+    icon = ERROR_ICON;
+    srPrefix = SCREEN_READER_ERROR;
+  } else {
+    return null;
+  }
+
+  const prefixWidth = isScreenReaderEnabled ? 11 : 3;
+  const prefix = isScreenReaderEnabled ? srPrefix : icon + ' ';
+
+  return (
+    <Box>
+      <Box width={prefixWidth} flexShrink={0}>
+        <Text color={color}>{prefix}</Text>
+      </Box>
+      <Text color={color}>{text}</Text>
+    </Box>
+  );
+};
 
 export const Composer = () => {
   const config = useConfig();
@@ -91,25 +144,19 @@ export const Composer = () => {
         flexDirection={isNarrow ? 'column' : 'row'}
         alignItems={isNarrow ? 'flex-start' : 'center'}
       >
-        <Box marginRight={1}>
+        <Box marginRight={1} flexDirection="row">
           {process.env['GEMINI_SYSTEM_MD'] && (
             <Text color={theme.status.error}>|⌐■_■| </Text>
           )}
-          {uiState.ctrlCPressedOnce ? (
-            <Text color={theme.status.warning}>
-              Press Ctrl+C again to exit.
-            </Text>
-          ) : uiState.warningMessage ? (
-            <Text color={theme.status.warning}>{uiState.warningMessage}</Text>
-          ) : uiState.ctrlDPressedOnce ? (
-            <Text color={theme.status.warning}>
-              Press Ctrl+D again to exit.
-            </Text>
-          ) : uiState.showEscapePrompt ? (
-            <Text color={theme.text.secondary}>Press Esc again to clear.</Text>
-          ) : uiState.queueErrorMessage ? (
-            <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>
-          ) : (
+          <TransientStatus
+            uiState={uiState}
+            isScreenReaderEnabled={isScreenReaderEnabled}
+          />
+          {!uiState.ctrlCPressedOnce &&
+            !uiState.warningMessage &&
+            !uiState.ctrlDPressedOnce &&
+            !uiState.showEscapePrompt &&
+            !uiState.queueErrorMessage &&
             !settings.merged.ui?.hideContextSummary &&
             !hideContextSummary && (
               <ContextSummaryDisplay
@@ -121,8 +168,7 @@ export const Composer = () => {
                   config.getMcpClientManager()?.getBlockedMcpServers() ?? []
                 }
               />
-            )
-          )}
+            )}
         </Box>
         <Box paddingTop={isNarrow ? 1 : 0}>
           {showAutoAcceptIndicator !== ApprovalMode.DEFAULT &&
