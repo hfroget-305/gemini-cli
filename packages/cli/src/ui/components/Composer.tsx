@@ -18,6 +18,14 @@ import { ShowMoreLines } from './ShowMoreLines.js';
 import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { theme } from '../semantic-colors.js';
+import {
+  INFO_ICON,
+  WARNING_ICON,
+  ERROR_ICON,
+  SCREEN_READER_INFO,
+  SCREEN_READER_WARNING,
+  SCREEN_READER_ERROR,
+} from '../textConstants.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
@@ -95,20 +103,56 @@ export const Composer = () => {
           {process.env['GEMINI_SYSTEM_MD'] && (
             <Text color={theme.status.error}>|⌐■_■| </Text>
           )}
-          {uiState.ctrlCPressedOnce ? (
-            <Text color={theme.status.warning}>
-              Press Ctrl+C again to exit.
-            </Text>
-          ) : uiState.warningMessage ? (
-            <Text color={theme.status.warning}>{uiState.warningMessage}</Text>
-          ) : uiState.ctrlDPressedOnce ? (
-            <Text color={theme.status.warning}>
-              Press Ctrl+D again to exit.
-            </Text>
-          ) : uiState.showEscapePrompt ? (
-            <Text color={theme.text.secondary}>Press Esc again to clear.</Text>
-          ) : uiState.queueErrorMessage ? (
-            <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>
+          {uiState.ctrlCPressedOnce ||
+          uiState.warningMessage ||
+          uiState.ctrlDPressedOnce ||
+          uiState.showEscapePrompt ||
+          uiState.queueErrorMessage ? (
+            <Box flexDirection="row">
+              <Box width={isScreenReaderEnabled ? 11 : 3} flexShrink={0}>
+                <Text
+                  color={
+                    uiState.queueErrorMessage
+                      ? theme.status.error
+                      : uiState.showEscapePrompt
+                        ? theme.text.secondary
+                        : theme.status.warning
+                  }
+                >
+                  {uiState.queueErrorMessage
+                    ? isScreenReaderEnabled
+                      ? SCREEN_READER_ERROR
+                      : ERROR_ICON
+                    : uiState.showEscapePrompt
+                      ? isScreenReaderEnabled
+                        ? SCREEN_READER_INFO
+                        : INFO_ICON
+                      : isScreenReaderEnabled
+                        ? SCREEN_READER_WARNING
+                        : WARNING_ICON}
+                  {!isScreenReaderEnabled && ' '}
+                </Text>
+              </Box>
+              <Text
+                color={
+                  uiState.queueErrorMessage
+                    ? theme.status.error
+                    : uiState.showEscapePrompt
+                      ? theme.text.secondary
+                      : theme.status.warning
+                }
+              >
+                {uiState.ctrlCPressedOnce
+                  ? 'Press Ctrl+C again to exit.'
+                  : uiState.warningMessage
+                    ? uiState.warningMessage
+                    : uiState.ctrlDPressedOnce
+                      ? 'Press Ctrl+D again to exit.'
+                      : uiState.showEscapePrompt
+                        ? 'Press Esc again to clear.'
+                        : uiState.queueErrorMessage}
+              </Text>
+            </Box>
           ) : (
             !settings.merged.ui?.hideContextSummary &&
             !hideContextSummary && (
