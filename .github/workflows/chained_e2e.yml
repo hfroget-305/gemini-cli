@@ -106,12 +106,84 @@ jobs:
           echo "REPO=$REPO" >> "$GITHUB_OUTPUT"
           echo "SHA=$SHA" >> "$GITHUB_OUTPUT"
 
+  fork_pr_authorization_gate:
+    name: 'Fork PR authorization gate'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    needs: 'parse_run_context'
+    permissions:
+      pull-requests: 'read'
+    outputs:
+      authorized: '${{ steps.check.outputs.authorized }}'
+    steps:
+      - id: 'check'
+        name: 'Check authorization'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea' # v7
+        env:
+          REPO: '${{ needs.parse_run_context.outputs.repository }}'
+          SHA: '${{ needs.parse_run_context.outputs.sha }}'
+        with:
+          script: |
+            // Trusted triggers: push to main, merge_group, manual dispatch.
+            // Only workflow_run from a fork PR requires explicit approval,
+            // because that path will check out and execute fork-controlled
+            // code (npm run build) on a self-hosted runner with secrets.
+            const trusted = ['push', 'merge_group', 'workflow_dispatch'];
+            if (trusted.includes(context.eventName)) {
+              core.info(`Trigger '${context.eventName}' is trusted; skipping label gate.`);
+              core.setOutput('authorized', 'true');
+              return;
+            }
+
+            const repoFull = process.env.REPO;
+            const sha = process.env.SHA;
+            const baseRepoFull = `${context.repo.owner}/${context.repo.repo}`;
+
+            if (repoFull === baseRepoFull) {
+              core.info('Head SHA belongs to the base repository; no fork gate needed.');
+              core.setOutput('authorized', 'true');
+              return;
+            }
+
+            // Fork PR: require a maintainer-applied `safe-to-test` label.
+            // Maintainers must review the diff before adding the label; the
+            // label must be re-applied after each new push (we look it up
+            // by head SHA, so a force-push invalidates prior approval).
+            const { data: prs } =
+              await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: sha,
+              });
+
+            const REQUIRED_LABEL = 'safe-to-test';
+            const approved = prs.some((pr) =>
+              pr.state === 'open' &&
+              pr.head.sha === sha &&
+              (pr.labels || []).some((l) => l.name === REQUIRED_LABEL),
+            );
+
+            if (!approved) {
+              core.setFailed(
+                `Fork PR (${repoFull}@${sha}) has not been authorized for ` +
+                `E2E. A maintainer must apply the '${REQUIRED_LABEL}' label ` +
+                `to the PR (and re-apply it after any new push) to run ` +
+                `e2e tests that execute fork-controlled code on the ` +
+                `self-hosted runner.`,
+              );
+              core.setOutput('authorized', 'false');
+              return;
+            }
+
+            core.info(`Authorized via '${REQUIRED_LABEL}' label on PR for ${sha}.`);
+            core.setOutput('authorized', 'true');
+
   set_pending_status:
     runs-on: 'gemini-cli-ubuntu-16-core'
     permissions:
       statuses: 'write'
     needs:
       - 'parse_run_context'
+      - 'fork_pr_authorization_gate'
     steps:
       - name: 'Set pending status'
         uses: 'myrotvorets/set-commit-status-action@16037e056d73b2d3c88e37e393ff369047f70886' # ratchet:myrotvorets/set-commit-status-action@master
@@ -129,9 +201,11 @@ jobs:
     needs:
       - 'merge_queue_skipper'
       - 'parse_run_context'
+      - 'fork_pr_authorization_gate'
     runs-on: 'gemini-cli-ubuntu-16-core'
     if: |
-      always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
+      needs.fork_pr_authorization_gate.outputs.authorized == 'true' &&
+      (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
     strategy:
       fail-fast: false
       matrix:
@@ -185,9 +259,11 @@ jobs:
     needs:
       - 'merge_queue_skipper'
       - 'parse_run_context'
+      - 'fork_pr_authorization_gate'
     runs-on: 'macos-latest'
     if: |
-      always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
+      needs.fork_pr_authorization_gate.outputs.authorized == 'true' &&
+      (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
@@ -228,8 +304,10 @@ jobs:
     needs:
       - 'merge_queue_skipper'
       - 'parse_run_context'
+      - 'fork_pr_authorization_gate'
     if: |
-      always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
+      needs.fork_pr_authorization_gate.outputs.authorized == 'true' &&
+      (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
     runs-on: 'gemini-cli-windows-16-core'
     continue-on-error: true
 
