@@ -53,7 +53,7 @@ jobs:
           REPO_NAME: '${{ github.event.inputs.repo_name }}'
         run: |
           mkdir -p ./pr
-          echo '${{ env.REPO_NAME }}' > ./pr/repo_name
+          printf '%s\n' "$REPO_NAME" > ./pr/repo_name
       - uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
           name: 'repo_name'
@@ -108,7 +108,8 @@ jobs:
 
   set_pending_status:
     runs-on: 'gemini-cli-ubuntu-16-core'
-    permissions: 'write-all'
+    permissions:
+      statuses: 'write'
     needs:
       - 'parse_run_context'
     steps:
@@ -153,7 +154,11 @@ jobs:
           node-version: '${{ matrix.node-version }}'
 
       - name: 'Install dependencies'
-        run: 'npm ci'
+        # --ignore-scripts: this workflow runs on workflow_run with access to
+        # secrets and can check out fork-controlled SHAs. Without this flag a
+        # malicious fork PR could ship a postinstall/prepare script that runs
+        # with the runner's tokens.
+        run: 'npm ci --ignore-scripts'
 
       - name: 'Build project'
         run: 'npm run build'
@@ -196,7 +201,11 @@ jobs:
           node-version: '20.x'
 
       - name: 'Install dependencies'
-        run: 'npm ci'
+        # --ignore-scripts: this workflow runs on workflow_run with access to
+        # secrets and can check out fork-controlled SHAs. Without this flag a
+        # malicious fork PR could ship a postinstall/prepare script that runs
+        # with the runner's tokens.
+        run: 'npm ci --ignore-scripts'
 
       - name: 'Build project'
         run: 'npm run build'
@@ -256,7 +265,11 @@ jobs:
         shell: 'pwsh'
 
       - name: 'Install dependencies'
-        run: 'npm ci'
+        # --ignore-scripts: this workflow runs on workflow_run with access to
+        # secrets and can check out fork-controlled SHAs. Without this flag a
+        # malicious fork PR could ship a postinstall/prepare script that runs
+        # with the runner's tokens.
+        run: 'npm ci --ignore-scripts'
         shell: 'pwsh'
 
       - name: 'Build project'
@@ -296,7 +309,8 @@ jobs:
 
   set_workflow_status:
     runs-on: 'gemini-cli-ubuntu-16-core'
-    permissions: 'write-all'
+    permissions:
+      statuses: 'write'
     if: 'always()'
     needs:
       - 'parse_run_context'
