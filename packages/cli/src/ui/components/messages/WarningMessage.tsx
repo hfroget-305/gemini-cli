@@ -16,9 +16,9 @@ interface WarningMessageProps {
 
 export const WarningMessage: React.FC<WarningMessageProps> = ({ text }) => {
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
-  const icon = WARNING_ICON + ' ';
+  const icon = WARNING_ICON;
   const srPrefix = SCREEN_READER_WARNING;
-  const prefixWidth = isScreenReaderEnabled ? srPrefix.length : icon.length;
+  const prefixWidth = isScreenReaderEnabled ? 11 : 3;
 
   return (
     <Box flexDirection="row" marginTop={1}>

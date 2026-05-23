@@ -15,9 +15,9 @@ interface ErrorMessageProps {
 
 export const ErrorMessage: React.FC<ErrorMessageProps> = ({ text }) => {
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
-  const icon = ERROR_ICON + ' ';
+  const icon = ERROR_ICON;
   const srPrefix = SCREEN_READER_ERROR;
-  const prefixWidth = isScreenReaderEnabled ? srPrefix.length : icon.length;
+  const prefixWidth = isScreenReaderEnabled ? 11 : 3;
 
   return (
     <Box flexDirection="row" marginBottom={1}>

@@ -28,9 +28,9 @@ export const InfoMessage: React.FC<InfoMessageProps> = ({
   if (isScreenReaderEnabled) {
     prefix = icon ? `[${icon}] ` : SCREEN_READER_INFO;
   } else {
-    prefix = (icon ?? INFO_ICON) + ' ';
+    prefix = icon ?? INFO_ICON;
   }
-  const prefixWidth = prefix.length;
+  const prefixWidth = isScreenReaderEnabled ? 11 : 3;
 
   return (
     <Box flexDirection="row" marginTop={1}>
