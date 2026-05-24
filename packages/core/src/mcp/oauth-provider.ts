@@ -297,13 +297,20 @@ export class MCPOAuthProvider {
               const error = url.searchParams.get('error');
 
               if (error) {
-                res.writeHead(HTTP_OK, { 'Content-Type': 'text/html' });
+                const escapeHtml = (s: string): string =>
+                  s
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+                res.writeHead(HTTP_OK, { 'Content-Type': 'text/html; charset=utf-8' });
                 res.end(`
               <html>
                 <body>
                   <h1>Authentication Failed</h1>
-                  <p>Error: ${(error as string).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
-                  <p>${((url.searchParams.get('error_description') || '') as string).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+                  <p>Error: ${escapeHtml(error)}</p>
+                  <p>${escapeHtml(url.searchParams.get('error_description') || '')}</p>
                   <p>You can close this window.</p>
                 </body>
               </html>

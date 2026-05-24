@@ -25,7 +25,18 @@ export class Storage {
   static getGlobalGeminiDir(): string {
     const homeDir = os.homedir();
     if (!homeDir) {
-      return path.join(os.tmpdir(), GEMINI_DIR);
+      // Refuse to fall back to a world-writable directory like /tmp.
+      // Storing OAuth tokens, MCP credentials, or auth state under
+      // os.tmpdir() lets any local user race a symlink into the path
+      // before we tighten perms, and lets directory enumeration leak
+      // server names. If we cannot find HOME, the caller must surface
+      // a clear error rather than silently degrade to insecure storage.
+      throw new Error(
+        'Unable to determine user home directory (HOME/USERPROFILE is ' +
+          'unset). Refusing to store Gemini CLI state in a temporary ' +
+          'directory because it would expose credentials to other ' +
+          'local users.',
+      );
     }
     return path.join(homeDir, GEMINI_DIR);
   }

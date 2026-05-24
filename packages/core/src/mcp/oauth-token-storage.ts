@@ -41,10 +41,20 @@ export class MCPOAuthTokenStorage implements TokenStorage {
 
   /**
    * Ensure the config directory exists.
+   *
+   * Created with mode 0o700 so other local users cannot enumerate
+   * stored MCP server names (which can themselves be sensitive).
+   * The token file itself is written with 0o600 elsewhere.
    */
   private async ensureConfigDir(): Promise<void> {
     const configDir = path.dirname(this.getTokenFilePath());
-    await fs.mkdir(configDir, { recursive: true });
+    await fs.mkdir(configDir, { recursive: true, mode: 0o700 });
+    // mkdir respects umask for already-existing dirs; tighten explicitly.
+    try {
+      await fs.chmod(configDir, 0o700);
+    } catch {
+      // Best-effort on platforms where chmod is a no-op (Windows).
+    }
   }
 
   /**
