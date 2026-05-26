@@ -99,10 +99,13 @@ jobs:
 
             if (sizeLabel === 'size/xl' && pr.state === 'open') {
               const MARKER = '<!-- size-xl-advice -->';
-              const { data: comments } =
-                await github.rest.issues.listComments({
-                  owner, repo, issue_number: prNumber, per_page: 100,
-                });
+              // Paginate across all comments — listComments returns one
+              // page at a time, so on a long-running PR the marker can
+              // sit on page 2+ and we'd re-post the advisory every run.
+              const comments = await github.paginate(
+                github.rest.issues.listComments,
+                { owner, repo, issue_number: prNumber, per_page: 100 },
+              );
               const alreadyPosted = comments.some((c) =>
                 (c.body || '').includes(MARKER),
               );

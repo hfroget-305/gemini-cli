@@ -75,7 +75,7 @@ jobs:
         if: 'always()'
         with:
           allowForks: 'true'
-          repo: '${{ github.repository }}'
+          repo: '${{ needs.parse_run_context.outputs.repository }}'
           sha: '${{ needs.parse_run_context.outputs.sha }}'
           token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           status: 'pending'
@@ -276,8 +276,11 @@ jobs:
         if: 'always()'
         with:
           allowForks: 'true'
-          repo: '${{ github.repository }}'
+          # Use the resolved repository (may be a fork for workflow_dispatch
+          # against an external SHA) and the robot PAT (the default
+          # GITHUB_TOKEN cannot write statuses across repos).
+          repo: '${{ needs.parse_run_context.outputs.repository }}'
           sha: '${{ needs.parse_run_context.outputs.sha }}'
-          token: '${{ secrets.GITHUB_TOKEN }}'
+          token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           status: '${{ needs.e2e.result }}'
           context: 'E2E (Chained)'
