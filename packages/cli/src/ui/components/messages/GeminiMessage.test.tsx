@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { describe, it, expect } from 'vitest';
 import { GeminiMessage } from './GeminiMessage.js';
 import { StreamingState } from '../../types.js';
 import { renderWithProviders } from '../../../test-utils/render.js';
