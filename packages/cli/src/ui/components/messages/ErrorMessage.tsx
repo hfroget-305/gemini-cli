@@ -7,7 +7,12 @@
 import type React from 'react';
 import { Text, Box, useIsScreenReaderEnabled } from 'ink';
 import { theme } from '../../semantic-colors.js';
-import { ERROR_ICON, SCREEN_READER_ERROR } from '../../textConstants.js';
+import {
+  ERROR_ICON,
+  SCREEN_READER_ERROR,
+  SCREEN_READER_PREFIX_WIDTH,
+  VISUAL_PREFIX_WIDTH,
+} from '../../textConstants.js';
 
 interface ErrorMessageProps {
   text: string;
@@ -17,7 +22,9 @@ export const ErrorMessage: React.FC<ErrorMessageProps> = ({ text }) => {
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
   const icon = ERROR_ICON + ' ';
   const srPrefix = SCREEN_READER_ERROR;
-  const prefixWidth = isScreenReaderEnabled ? srPrefix.length : icon.length;
+  const prefixWidth = isScreenReaderEnabled
+    ? SCREEN_READER_PREFIX_WIDTH
+    : VISUAL_PREFIX_WIDTH;
 
   return (
     <Box flexDirection="row" marginBottom={1}>
