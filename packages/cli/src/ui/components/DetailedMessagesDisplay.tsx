@@ -22,6 +22,8 @@ import {
   SCREEN_READER_WARNING,
   SCREEN_READER_ERROR,
   SCREEN_READER_DEBUG,
+  SCREEN_READER_PREFIX_WIDTH,
+  VISUAL_PREFIX_WIDTH,
 } from '../textConstants.js';
 
 interface DetailedMessagesDisplayProps {
@@ -37,7 +39,9 @@ export const DetailedMessagesDisplay: React.FC<
   const scrollableListRef = useRef<ScrollableListRef<ConsoleMessageItem>>(null);
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
 
-  const iconBoxWidth = isScreenReaderEnabled ? 11 : 3;
+  const iconBoxWidth = isScreenReaderEnabled
+    ? SCREEN_READER_PREFIX_WIDTH
+    : VISUAL_PREFIX_WIDTH;
   const borderAndPadding = 3;
 
   const estimatedItemHeight = useCallback(
