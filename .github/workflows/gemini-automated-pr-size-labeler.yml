@@ -99,16 +99,25 @@ jobs:
 
             if (sizeLabel === 'size/xl' && pr.state === 'open') {
               const MARKER = '<!-- size-xl-advice -->';
-              // Paginate across all comments — listComments returns one
-              // page at a time, so on a long-running PR the marker can
-              // sit on page 2+ and we'd re-post the advisory every run.
-              const comments = await github.paginate(
-                github.rest.issues.listComments,
-                { owner, repo, issue_number: prNumber, per_page: 100 },
-              );
-              const alreadyPosted = comments.some((c) =>
-                (c.body || '').includes(MARKER),
-              );
+              // Fast path: if the PR was already size/xl on the previous
+              // run, the advisory comment has already been posted (or
+              // explicitly suppressed by a maintainer) and we don't need
+              // to re-scan every comment on every push. Only paginate
+              // when this is the FIRST time the PR is being marked xl.
+              const wasAlreadyXl = currentLabels.has('size/xl');
+              let alreadyPosted = wasAlreadyXl;
+              if (!wasAlreadyXl) {
+                // Paginate across all comments — listComments returns one
+                // page at a time, so on a long-running PR the marker can
+                // sit on page 2+ and we'd re-post the advisory every run.
+                const comments = await github.paginate(
+                  github.rest.issues.listComments,
+                  { owner, repo, issue_number: prNumber, per_page: 100 },
+                );
+                alreadyPosted = comments.some((c) =>
+                  (c.body || '').includes(MARKER),
+                );
+              }
               if (!alreadyPosted) {
                 const body =
                   MARKER + '\n' +

@@ -40,20 +40,30 @@ export class MCPOAuthTokenStorage implements TokenStorage {
   }
 
   /**
-   * Ensure the config directory exists.
-   *
-   * Created with mode 0o700 so other local users cannot enumerate
-   * stored MCP server names (which can themselves be sensitive).
-   * The token file itself is written with 0o600 elsewhere.
+   * Ensure the config directory exists. Refuses to operate when the
+   * directory would land in a shared /tmp (HOME unset) — see
+   * Storage.requireSecureGeminiDir. Creates with mode 0o700 so other
+   * local users cannot enumerate stored MCP server names.
    */
   private async ensureConfigDir(): Promise<void> {
+    // Re-validates HOME at write time, not module-load time, so the CLI
+    // boots in environments without HOME and only errors when the user
+    // actually attempts an authentication.
+    Storage.requireSecureGeminiDir();
     const configDir = path.dirname(this.getTokenFilePath());
-    await fs.mkdir(configDir, { recursive: true, mode: 0o700 });
-    // mkdir respects umask for already-existing dirs; tighten explicitly.
+    const created = await fs.mkdir(configDir, {
+      recursive: true,
+      mode: 0o700,
+    });
+    if (created !== undefined) {
+      // Newly created — mode 0o700 already applied by mkdir.
+      return;
+    }
+    // Pre-existing dir: tighten perms (no-op on Windows).
     try {
       await fs.chmod(configDir, 0o700);
     } catch {
-      // Best-effort on platforms where chmod is a no-op (Windows).
+      // Best-effort on platforms where chmod is a no-op.
     }
   }
 

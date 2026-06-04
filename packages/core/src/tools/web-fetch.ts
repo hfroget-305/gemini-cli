@@ -21,7 +21,11 @@ import { getErrorMessage } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import { getResponseText } from '../utils/partUtils.js';
-import { fetchWithTimeout, isPrivateUrl } from '../utils/fetch.js';
+import {
+  fetchPinned,
+  resolveUrl,
+  type UrlResolution,
+} from '../utils/fetch.js';
 import { convert } from 'html-to-text';
 import {
   logWebFetchFallbackAttempt,
@@ -45,6 +49,11 @@ const MAX_RESPONSE_BYTES = 10 * 1024 * 1024; // 10 MiB
  * like `github.com.evil.tld`.
  */
 function maybeRewriteGithubBlobUrl(input: string): string {
+  // Cheap substring gate: the vast majority of URLs we see are not
+  // github blob URLs and don't need URL parsing.
+  if (!input.includes('github.com') || !input.includes('/blob/')) {
+    return input;
+  }
   let parsed: URL;
   try {
     parsed = new URL(input);
@@ -100,9 +109,15 @@ async function readResponseBodyBounded(
     chunks.push(decoder.decode());
     return chunks.join('');
   }
-  // Fallback when the runtime/mock does not expose a body stream.
+  // Fallback when response.body is unavailable. In production Node
+  // (>= 18) fetch always provides body; this branch exists for test
+  // mocks and exotic runtimes. We still truncate by BYTES (not code
+  // units) so multi-byte UTF-8 content respects the maxBytes cap.
   const text = await response.text();
-  return text.length > maxBytes ? text.slice(0, maxBytes) : text;
+  const buf = Buffer.from(text, 'utf8');
+  return buf.byteLength > maxBytes
+    ? buf.subarray(0, maxBytes).toString('utf8')
+    : text;
 }
 
 /**
@@ -192,17 +207,27 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     super(params, messageBus, _toolName, _toolDisplayName);
   }
 
-  private async executeFallback(signal: AbortSignal): Promise<ToolResult> {
-    const { validUrls: urls } = parsePrompt(this.params.prompt);
-    // For now, we only support one URL for fallback
-    let url = urls[0];
-    url = maybeRewriteGithubBlobUrl(url);
+  private async executeFallback(
+    signal: AbortSignal,
+    preFetched?: { url: string; resolution: UrlResolution },
+  ): Promise<ToolResult> {
+    let url: string;
+    let resolution: UrlResolution | null;
+    if (preFetched) {
+      url = preFetched.url;
+      resolution = preFetched.resolution;
+    } else {
+      const { validUrls: urls } = parsePrompt(this.params.prompt);
+      // For now, we only support one URL for fallback
+      url = maybeRewriteGithubBlobUrl(urls[0]);
+      resolution = await resolveUrl(url);
+    }
 
     // SSRF guard: refuse anything that resolves to a private/loopback/
-    // metadata address. Callers route here AFTER a literal-IP check; we
-    // re-check with DNS resolution to catch hostnames that resolve to
-    // private space.
-    if (await isPrivateUrl(url)) {
+    // metadata address. The actual connection will be pinned to
+    // resolution.resolvedAddress via fetchPinned so a DNS rebind cannot
+    // change the destination between this check and the connection.
+    if (!resolution || resolution.isPrivate) {
       const msg = `Refusing to fetch ${url}: resolves to a private, loopback, or metadata address.`;
       return {
         llmContent: `Error: ${msg}`,
@@ -214,7 +239,11 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     try {
       const response = await retryWithBackoff(
         async () => {
-          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS);
+          const res = await fetchPinned(
+            url,
+            resolution!,
+            URL_FETCH_TIMEOUT_MS,
+          );
           if (!res.ok) {
             const error = new Error(
               `Request failed with status code ${res.status} ${res.statusText}`,
@@ -326,16 +355,20 @@ ${textContent}
   async execute(signal: AbortSignal): Promise<ToolResult> {
     const userPrompt = this.params.prompt;
     const { validUrls: urls } = parsePrompt(userPrompt);
-    const url = urls[0];
-    const isPrivate = await isPrivateUrl(url);
+    const rawUrl = urls[0];
+    // Rewrite + resolve once. The resolution is reused if we end up on
+    // the fallback path so we don't pay another DNS lookup, and it pins
+    // the eventual connection to the IP we just verified.
+    const rewrittenUrl = maybeRewriteGithubBlobUrl(rawUrl);
+    const resolution = await resolveUrl(rewrittenUrl);
 
-    if (isPrivate) {
+    if (!resolution || resolution.isPrivate) {
       logWebFetchFallbackAttempt(
         this.config,
         new WebFetchFallbackAttemptEvent('private_ip'),
       );
       const msg =
-        `Refusing to fetch ${url}: hostname resolves to a private, ` +
+        `Refusing to fetch ${rawUrl}: hostname resolves to a private, ` +
         `loopback, or cloud-metadata address. This is blocked to prevent ` +
         `SSRF (server-side request forgery) leaking internal data.`;
       return {
@@ -407,7 +440,11 @@ ${textContent}
           this.config,
           new WebFetchFallbackAttemptEvent('primary_failed'),
         );
-        return await this.executeFallback(signal);
+        // Reuse the URL + resolution computed at the top of execute().
+        return await this.executeFallback(signal, {
+          url: rewrittenUrl,
+          resolution,
+        });
       }
 
       const sourceListFormatted: string[] = [];

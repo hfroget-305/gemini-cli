@@ -25,17 +25,30 @@ export class Storage {
   static getGlobalGeminiDir(): string {
     const homeDir = os.homedir();
     if (!homeDir) {
-      // Refuse to fall back to a world-writable directory like /tmp.
-      // Storing OAuth tokens, MCP credentials, or auth state under
-      // os.tmpdir() lets any local user race a symlink into the path
-      // before we tighten perms, and lets directory enumeration leak
-      // server names. If we cannot find HOME, the caller must surface
-      // a clear error rather than silently degrade to insecure storage.
+      // Fall back to os.tmpdir() so non-credential paths (settings,
+      // history, telemetry id) still work in barebones containers
+      // where HOME is unset. Credential storage layers (OAuth token
+      // storage, Code Assist OAuth) must call requireSecureGeminiDir()
+      // and refuse to use a /tmp-rooted path.
+      return path.join(os.tmpdir(), GEMINI_DIR);
+    }
+    return path.join(homeDir, GEMINI_DIR);
+  }
+
+  /**
+   * Returns the global Gemini directory only if it is under the user's
+   * real home directory. Throws otherwise. Use this from credential
+   * storage layers to refuse writing secrets to a world-writable
+   * temporary directory.
+   */
+  static requireSecureGeminiDir(): string {
+    const homeDir = os.homedir();
+    if (!homeDir) {
       throw new Error(
-        'Unable to determine user home directory (HOME/USERPROFILE is ' +
-          'unset). Refusing to store Gemini CLI state in a temporary ' +
-          'directory because it would expose credentials to other ' +
-          'local users.',
+        'Refusing to write Gemini CLI credentials: HOME/USERPROFILE is ' +
+          'unset, so the credential storage path would land in a shared ' +
+          'temporary directory readable by other local users. Set HOME ' +
+          'to a user-owned directory before authenticating.',
       );
     }
     return path.join(homeDir, GEMINI_DIR);

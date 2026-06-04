@@ -7,8 +7,9 @@
 import { getErrorMessage, isNodeError } from './errors.js';
 import { URL } from 'node:url';
 import * as dns from 'node:dns/promises';
+import type { LookupOptions } from 'node:dns';
 import * as net from 'node:net';
-import { ProxyAgent, setGlobalDispatcher } from 'undici';
+import { Agent, fetch as undiciFetch, ProxyAgent, setGlobalDispatcher } from 'undici';
 
 // Hostnames that resolve to loopback regardless of /etc/hosts trickery.
 const LOOPBACK_HOSTNAMES = new Set([
@@ -55,7 +56,8 @@ function isPrivateIPv4(ip: string): boolean {
   if ((n & 0xff000000) === 0x00000000) return true;
   // 10.0.0.0/8
   if ((n & 0xff000000) === 0x0a000000) return true;
-  // 100.64.0.0/10 — carrier-grade NAT (RFC 6598)
+  // 100.64.0.0/10 — carrier-grade NAT (RFC 6598); includes Alibaba IMDS
+  // 100.100.100.200.
   if ((n & 0xffc00000) === 0x64400000) return true;
   // 127.0.0.0/8 — loopback
   if ((n & 0xff000000) === 0x7f000000) return true;
@@ -83,14 +85,16 @@ function isPrivateIPv6(ip: string): boolean {
   // ::, ::1 (loopback)
   if (lower === '::' || lower === '::1') return true;
   // ::ffff:x.x.x.x — IPv4-mapped
-  const v4MappedMatch = lower.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  const v4MappedMatch = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(lower);
   if (v4MappedMatch) return isPrivateIPv4(v4MappedMatch[1]);
   // fc00::/7 — unique local addresses (covers fc00:..fdff:)
-  if (/^f[cd][0-9a-f]{2}:/i.test(lower)) return true;
+  if (/^f[cd][0-9a-f]{2}:/.test(lower)) return true;
   // fe80::/10 — link-local
-  if (/^fe[89ab][0-9a-f]:/i.test(lower)) return true;
+  if (/^fe[89ab][0-9a-f]:/.test(lower)) return true;
+  // fec0::/10 — deprecated site-local (RFC 3879), still in legacy deployments
+  if (/^fe[cdef][0-9a-f]:/.test(lower)) return true;
   // ff00::/8 — multicast
-  if (/^ff[0-9a-f]{2}:/i.test(lower)) return true;
+  if (/^ff[0-9a-f]{2}:/.test(lower)) return true;
   return false;
 }
 
@@ -111,7 +115,7 @@ function isPrivateLiteral(hostname: string): boolean {
  * and well-known loopback/metadata names without DNS.
  *
  * For comprehensive SSRF protection that resolves DNS-based bypasses (a
- * hostname that resolves to a private IP), call `isPrivateUrl` instead.
+ * hostname that resolves to a private IP), call `resolveUrl` instead.
  */
 export function isPrivateIp(url: string): boolean {
   try {
@@ -121,38 +125,125 @@ export function isPrivateIp(url: string): boolean {
   }
 }
 
+/** Cached DNS resolution + private-IP verdict for a URL. */
+export type UrlResolution = {
+  /** The hostname as parsed from the URL (may include []). */
+  hostname: string;
+  /** A single resolved IP literal to pin the eventual connection to. */
+  resolvedAddress: string;
+  /** Family of the resolved address. */
+  family: 4 | 6;
+  /**
+   * True if the URL must not be fetched — either the hostname is a
+   * well-known private/loopback/metadata name, or DNS resolution
+   * returned an address inside a private/loopback/metadata range, or
+   * DNS resolution failed (fail-safe).
+   */
+  isPrivate: boolean;
+};
+
+const RESOLUTION_CACHE_TTL_MS = 60_000;
+const resolutionCache = new Map<
+  string,
+  { resolution: UrlResolution; expires: number }
+>();
+
 /**
- * Full SSRF check: resolves the hostname via DNS and treats the URL as
- * private if any resolved address falls inside a private/loopback/
- * metadata range. Use this on every URL the CLI is about to fetch.
+ * Resolve the URL's hostname via DNS and decide whether it is safe to
+ * fetch. The returned resolution carries a *single* IP literal that
+ * the caller should use to pin the connection (see `fetchPinned`);
+ * pinning closes the DNS-rebinding TOCTOU between this check and the
+ * actual fetch.
+ *
+ * Result is cached for {@link RESOLUTION_CACHE_TTL_MS}; a hostname
+ * resolved once in a session keeps that resolution for subsequent
+ * fetches in the same window.
  */
-export async function isPrivateUrl(url: string): Promise<boolean> {
+export async function resolveUrl(url: string): Promise<UrlResolution | null> {
   let hostname: string;
   try {
     hostname = new URL(url).hostname;
   } catch {
-    return false;
+    return null;
   }
-  if (isPrivateLiteral(hostname)) return true;
+
+  const cacheKey = hostname.toLowerCase();
+  const cached = resolutionCache.get(cacheKey);
+  if (cached && cached.expires > Date.now()) return cached.resolution;
 
   const stripped = hostname.startsWith('[') && hostname.endsWith(']')
     ? hostname.slice(1, -1)
     : hostname;
+
+  let resolution: UrlResolution;
   if (net.isIP(stripped) !== 0) {
-    // Pure IP literal already handled by isPrivateLiteral.
-    return false;
+    // IP literal — no DNS needed.
+    resolution = {
+      hostname,
+      resolvedAddress: stripped,
+      family: net.isIP(stripped) === 6 ? 6 : 4,
+      isPrivate: isPrivateLiteral(hostname),
+    };
+  } else if (
+    LOOPBACK_HOSTNAMES.has(hostname.toLowerCase()) ||
+    METADATA_HOSTNAMES.has(hostname.toLowerCase())
+  ) {
+    // Known-private hostname; don't even bother resolving.
+    resolution = {
+      hostname,
+      resolvedAddress: '0.0.0.0',
+      family: 4,
+      isPrivate: true,
+    };
+  } else {
+    try {
+      const addrs = await dns.lookup(hostname, {
+        all: true,
+        verbatim: true,
+      });
+      const anyPrivate = addrs.some((a) =>
+        a.family === 6 ? isPrivateIPv6(a.address) : isPrivateIPv4(a.address),
+      );
+      const first = addrs[0];
+      resolution = {
+        hostname,
+        resolvedAddress: first.address,
+        family: first.family as 4 | 6,
+        isPrivate: anyPrivate,
+      };
+    } catch {
+      // Fail-safe: refuse the fetch when DNS fails. Treating as private
+      // is the safest default and matches the prior isPrivateUrl()
+      // behavior (which returned true on lookup failure).
+      resolution = {
+        hostname,
+        resolvedAddress: '0.0.0.0',
+        family: 4,
+        isPrivate: true,
+      };
+    }
   }
 
-  try {
-    const addrs = await dns.lookup(hostname, { all: true, verbatim: true });
-    return addrs.some((a) =>
-      a.family === 6 ? isPrivateIPv6(a.address) : isPrivateIPv4(a.address),
-    );
-  } catch {
-    // If DNS fails, fail safe: treat as private/unknown so the caller
-    // refuses rather than silently fetching an arbitrary endpoint.
-    return true;
-  }
+  resolutionCache.set(cacheKey, {
+    resolution,
+    expires: Date.now() + RESOLUTION_CACHE_TTL_MS,
+  });
+  return resolution;
+}
+
+/**
+ * Full SSRF check: resolves the hostname via DNS and treats the URL as
+ * private if any resolved address falls inside a private/loopback/
+ * metadata range. Use this on every URL the CLI is about to fetch.
+ *
+ * Note: this is a thin wrapper over `resolveUrl` for callers that only
+ * care about the boolean verdict. Callers that go on to actually fetch
+ * should use `resolveUrl` + `fetchPinned` to close the DNS-rebinding
+ * window between the check and the connection.
+ */
+export async function isPrivateUrl(url: string): Promise<boolean> {
+  const r = await resolveUrl(url);
+  return r === null || r.isPrivate;
 }
 
 export async function fetchWithTimeout(
@@ -175,6 +266,68 @@ export async function fetchWithTimeout(
   }
 }
 
+/**
+ * Like `fetchWithTimeout`, but pins the underlying TCP connection to
+ * the IP address in `resolution`. This closes the DNS-rebinding TOCTOU
+ * window — a hostname cannot resolve to a public IP at check time and
+ * a private/metadata IP at connect time.
+ *
+ * TLS SNI / certificate validation continues to use the URL's hostname.
+ */
+export async function fetchPinned(
+  url: string,
+  resolution: UrlResolution,
+  timeout: number,
+): Promise<Response> {
+  if (resolution.isPrivate) {
+    throw new FetchError(
+      `Refusing to fetch ${url}: resolves to a private, loopback, or ` +
+        `cloud-metadata address (${resolution.resolvedAddress}).`,
+      'EPRIVATE',
+    );
+  }
+
+  const dispatcher = new Agent({
+    connect: {
+      // Pin the address. Node's `lookup` signature is
+      // (host, options, callback) → callback(err, address, family).
+      // We ignore the requested host and always return our resolved IP.
+      lookup: (
+        _host: string,
+        _opts: LookupOptions,
+        cb: (err: NodeJS.ErrnoException | null, address: string, family: number) => void,
+      ) => cb(null, resolution.resolvedAddress, resolution.family),
+    },
+  });
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    // Cast to unknown then Response because undici's fetch return type
+    // is structurally identical to the global Response.
+    const response = (await undiciFetch(url, {
+      signal: controller.signal,
+      dispatcher,
+    })) as unknown as Response;
+    return response;
+  } catch (error) {
+    if (isNodeError(error) && error.code === 'ABORT_ERR') {
+      throw new FetchError(`Request timed out after ${timeout}ms`, 'ETIMEDOUT');
+    }
+    throw new FetchError(getErrorMessage(error), undefined, { cause: error });
+  } finally {
+    clearTimeout(timeoutId);
+    // Free the connection pool.
+    void dispatcher.close();
+  }
+}
+
 export function setGlobalProxy(proxy: string) {
   setGlobalDispatcher(new ProxyAgent(proxy));
+}
+
+/** Test-only: clear the resolution cache between tests. */
+export function _clearResolutionCacheForTests(): void {
+  resolutionCache.clear();
 }
