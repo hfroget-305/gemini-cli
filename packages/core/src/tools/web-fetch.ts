@@ -49,11 +49,6 @@ const MAX_RESPONSE_BYTES = 10 * 1024 * 1024; // 10 MiB
  * like `github.com.evil.tld`.
  */
 function maybeRewriteGithubBlobUrl(input: string): string {
-  // Cheap substring gate: the vast majority of URLs we see are not
-  // github blob URLs and don't need URL parsing.
-  if (!input.includes('github.com') || !input.includes('/blob/')) {
-    return input;
-  }
   let parsed: URL;
   try {
     parsed = new URL(input);
