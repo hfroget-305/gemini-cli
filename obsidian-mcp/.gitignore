@@ -1,0 +1,4 @@
+# Never commit real secrets or local MCP config containing keys
+.env
+.mcp.json
+mcp.local.json
