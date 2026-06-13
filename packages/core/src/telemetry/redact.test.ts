@@ -38,8 +38,38 @@ describe('redactSensitiveArgs', () => {
       ['webhook_secret', 'xyz'],
       ['x_api_key', 'xyz'],
       ['x-api-key', 'xyz'],
+      ['X-API-KEY', 'xyz'],
+      ['token', 'xyz'],
+      ['cookie', 'sessionid=abc'],
+      ['Cookie', 'sessionid=abc'],
+      ['set-cookie', 'sessionid=abc'],
+      ['Set-Cookie', 'sessionid=abc'],
+      ['dsn', 'postgres://u:p@host/db'],
+      ['DSN', 'postgres://u:p@host/db'],
+      ['database_url', 'postgres://u:p@host/db'],
+      ['db_url', 'postgres://u:p@host/db'],
+      ['connection_string', 'Server=...'],
     ])('redacts value for key %s', (key, value) => {
       const out = redactSensitiveArgs({ [key]: value }) as Record<
+        string,
+        unknown
+      >;
+      expect(out[key]).toBe(REDACTED);
+    });
+
+    it.each([
+      'openaiApiKey',
+      'googleApiKey',
+      'githubToken',
+      'awsSecretAccessKey',
+      'dbPassword',
+      'stripeSecretKey',
+      'slackBotToken',
+      'mySessionToken',
+      'firebaseAuthToken',
+      'csrfToken',
+    ])('redacts prefixed camelCase secret key %s', (key) => {
+      const out = redactSensitiveArgs({ [key]: 'opaque-value' }) as Record<
         string,
         unknown
       >;
@@ -54,6 +84,8 @@ describe('redactSensitiveArgs', () => {
       'message',
       'file_path',
       'command',
+      'userId',
+      'authorityName',
     ])('does not redact for benign key %s', (key) => {
       const out = redactSensitiveArgs({ [key]: 'plain value' }) as Record<
         string,
@@ -70,15 +102,67 @@ describe('redactSensitiveArgs', () => {
       expect(out.config.auth).toBe(REDACTED);
     });
 
-    it('redacts inside arrays of objects', () => {
+    it('redacts inside arrays of objects by key match', () => {
       const out = redactSensitiveArgs({
-        headers: [
-          { name: 'Content-Type', value: 'application/json' },
-          { name: 'X-Api-Key', api_key: 'leak' },
+        items: [
+          { name: 'Content-Type', api_key: 'leak' },
+          { name: 'OK', other: 'fine' },
         ],
+      }) as { items: Array<Record<string, unknown>> };
+      expect(out.items[0]['api_key']).toBe(REDACTED);
+      expect(out.items[1]['other']).toBe('fine');
+    });
+  });
+
+  describe('sibling-aware HTTP header redaction', () => {
+    it.each([
+      'Authorization',
+      'authorization',
+      'Cookie',
+      'cookie',
+      'Set-Cookie',
+      'set-cookie',
+      'X-Api-Key',
+      'x-api-key',
+      'Proxy-Authorization',
+      'X-Auth-Token',
+      'X-Csrf-Token',
+      'X-Amz-Security-Token',
+    ])('redacts {name: %s, value: ...} value', (name) => {
+      const out = redactSensitiveArgs({
+        headers: [{ name, value: 'opaque-credential' }],
+      }) as { headers: Array<Record<string, unknown>> };
+      expect(out.headers[0]['value']).toBe(REDACTED);
+      // Name is preserved (it's the header name, not the secret).
+      expect(out.headers[0]['name']).toBe(name);
+    });
+
+    it('redacts {key: Cookie, value: ...} variant', () => {
+      const out = redactSensitiveArgs({
+        headers: [{ key: 'Cookie', value: 'sessionid=abc; csrf=def' }],
+      }) as { headers: Array<Record<string, unknown>> };
+      expect(out.headers[0]['value']).toBe(REDACTED);
+    });
+
+    it('redacts {header: Authorization, value: ...} variant', () => {
+      const out = redactSensitiveArgs({
+        headers: [{ header: 'Authorization', value: 'Bearer xyz' }],
+      }) as { headers: Array<Record<string, unknown>> };
+      expect(out.headers[0]['value']).toBe(REDACTED);
+    });
+
+    it('does NOT redact value when name is a benign header', () => {
+      const out = redactSensitiveArgs({
+        headers: [{ name: 'Content-Type', value: 'application/json' }],
       }) as { headers: Array<Record<string, unknown>> };
       expect(out.headers[0]['value']).toBe('application/json');
-      expect(out.headers[1]['api_key']).toBe(REDACTED);
+    });
+
+    it('does NOT redact a stray `value` field outside the header-pair shape', () => {
+      const out = redactSensitiveArgs({
+        setting: { value: 'plain-config-value' },
+      }) as { setting: Record<string, unknown> };
+      expect(out.setting['value']).toBe('plain-config-value');
     });
   });
 
@@ -103,6 +187,13 @@ describe('redactSensitiveArgs', () => {
       ['openai project', 'sk-proj-' + 'a'.repeat(48)],
       ['anthropic', 'sk-ant-' + 'a'.repeat(40)],
       ['npm token', 'npm_' + 'a'.repeat(36)],
+      ['http bearer', 'Bearer eyJhbGciOi.foo.bar'],
+      ['http basic', 'Basic dXNlcjpwYXNz'],
+      ['credentialed postgres url', 'postgres://user:pass@host:5432/db'],
+      ['credentialed mysql url', 'mysql://root:hunter2@127.0.0.1/app'],
+      ['credentialed mongodb srv', 'mongodb+srv://u:p@cluster.example.com/db'],
+      ['credentialed https url', 'https://user:s3cr3t@example.com/path'],
+      ['credentialed redis url', 'redis://default:pw@redis.local:6379/0'],
     ])('redacts %s value under a benign key', (_, value) => {
       const out = redactSensitiveArgs({ message: value }) as Record<
         string,
@@ -119,6 +210,9 @@ describe('redactSensitiveArgs', () => {
       'AKIA_too_short',
       'arbitrary base64 looking data SGVsbG8gd29ybGQ=',
       'embedded ghp_ABCDEFGHIJ in a longer error message', // not whole-string
+      'https://user@example.com', // userinfo without password
+      'https://example.com/api?password=hidden', // no userinfo:pw@ shape
+      'I will use Bearer tokens for auth', // not the Bearer-prefix shape
     ])('does not redact benign value %s', (value) => {
       const out = redactSensitiveArgs({ message: value }) as Record<
         string,
