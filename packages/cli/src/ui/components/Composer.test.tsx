@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { render } from '../../test-utils/render.js';
-import { Text } from 'ink';
+import { Text, useIsScreenReaderEnabled } from 'ink';
 import { Composer } from './Composer.js';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
 import {
@@ -21,6 +21,10 @@ vi.mock('../contexts/VimModeContext.js', () => ({
     vimEnabled: false,
     vimMode: 'NORMAL',
   })),
+}));
+vi.mock('ink', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useIsScreenReaderEnabled: vi.fn(() => false),
 }));
 import { ApprovalMode } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
@@ -335,33 +339,50 @@ describe('Composer', () => {
       expect(lastFrame()).toContain('ContextSummaryDisplay');
     });
 
-    it('shows Ctrl+C exit prompt when ctrlCPressedOnce is true', () => {
+    it('shows Ctrl+C exit prompt with icon when ctrlCPressedOnce is true', () => {
       const uiState = createMockUIState({
         ctrlCPressedOnce: true,
       });
 
       const { lastFrame } = renderComposer(uiState);
 
+      expect(lastFrame()).toContain('⚠');
       expect(lastFrame()).toContain('Press Ctrl+C again to exit');
     });
 
-    it('shows Ctrl+D exit prompt when ctrlDPressedOnce is true', () => {
+    it('shows Ctrl+C exit prompt with screen reader prefix when enabled', () => {
+      vi.mocked(useIsScreenReaderEnabled).mockReturnValue(true);
+      const uiState = createMockUIState({
+        ctrlCPressedOnce: true,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain('[warning]');
+      expect(lastFrame()).toContain('Press Ctrl+C again to exit');
+    });
+
+    it('shows Ctrl+D exit prompt with icon when ctrlDPressedOnce is true', () => {
+      vi.mocked(useIsScreenReaderEnabled).mockReturnValue(false);
       const uiState = createMockUIState({
         ctrlDPressedOnce: true,
       });
 
       const { lastFrame } = renderComposer(uiState);
 
+      expect(lastFrame()).toContain('⚠');
       expect(lastFrame()).toContain('Press Ctrl+D again to exit');
     });
 
-    it('shows escape prompt when showEscapePrompt is true', () => {
+    it('shows escape prompt with icon when showEscapePrompt is true', () => {
+      vi.mocked(useIsScreenReaderEnabled).mockReturnValue(false);
       const uiState = createMockUIState({
         showEscapePrompt: true,
       });
 
       const { lastFrame } = renderComposer(uiState);
 
+      expect(lastFrame()).toContain('ℹ');
       expect(lastFrame()).toContain('Press Esc again to clear');
     });
   });

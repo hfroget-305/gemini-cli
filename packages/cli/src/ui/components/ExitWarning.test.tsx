@@ -8,8 +8,13 @@ import { render } from '../../test-utils/render.js';
 import { ExitWarning } from './ExitWarning.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useUIState, type UIState } from '../contexts/UIStateContext.js';
+import { useIsScreenReaderEnabled } from 'ink';
 
 vi.mock('../contexts/UIStateContext.js');
+vi.mock('ink', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useIsScreenReaderEnabled: vi.fn(),
+}));
 
 describe('ExitWarning', () => {
   const mockUseUIState = vi.mocked(useUIState);
@@ -28,13 +33,27 @@ describe('ExitWarning', () => {
     expect(lastFrame()).toBe('');
   });
 
-  it('renders Ctrl+C warning when pressed once and dialogs visible', () => {
+  it('renders Ctrl+C warning with icon when pressed once and dialogs visible', () => {
+    vi.mocked(useIsScreenReaderEnabled).mockReturnValue(false);
     mockUseUIState.mockReturnValue({
       dialogsVisible: true,
       ctrlCPressedOnce: true,
       ctrlDPressedOnce: false,
     } as unknown as UIState);
     const { lastFrame } = render(<ExitWarning />);
+    expect(lastFrame()).toContain('⚠');
+    expect(lastFrame()).toContain('Press Ctrl+C again to exit');
+  });
+
+  it('renders Ctrl+C warning with screen reader prefix when enabled', () => {
+    vi.mocked(useIsScreenReaderEnabled).mockReturnValue(true);
+    mockUseUIState.mockReturnValue({
+      dialogsVisible: true,
+      ctrlCPressedOnce: true,
+      ctrlDPressedOnce: false,
+    } as unknown as UIState);
+    const { lastFrame } = render(<ExitWarning />);
+    expect(lastFrame()).toContain('[warning]');
     expect(lastFrame()).toContain('Press Ctrl+C again to exit');
   });
 
