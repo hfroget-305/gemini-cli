@@ -6,6 +6,14 @@
 
 import { useState } from 'react';
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
+import {
+  INFO_ICON,
+  WARNING_ICON,
+  ERROR_ICON,
+  SCREEN_READER_INFO,
+  SCREEN_READER_WARNING,
+  SCREEN_READER_ERROR,
+} from '../textConstants.js';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
 import { AutoAcceptIndicator } from './AutoAcceptIndicator.js';
@@ -91,24 +99,61 @@ export const Composer = () => {
         flexDirection={isNarrow ? 'column' : 'row'}
         alignItems={isNarrow ? 'flex-start' : 'center'}
       >
-        <Box marginRight={1}>
+        <Box marginRight={1} flexDirection="row">
           {process.env['GEMINI_SYSTEM_MD'] && (
             <Text color={theme.status.error}>|⌐■_■| </Text>
           )}
           {uiState.ctrlCPressedOnce ? (
-            <Text color={theme.status.warning}>
-              Press Ctrl+C again to exit.
-            </Text>
+            <Box flexDirection="row">
+              <Box width={isScreenReaderEnabled ? 11 : 3} flexShrink={0}>
+                <Text color={theme.status.warning}>
+                  {isScreenReaderEnabled ? SCREEN_READER_WARNING : WARNING_ICON}
+                </Text>
+              </Box>
+              <Text color={theme.status.warning}>
+                Press Ctrl+C again to exit.
+              </Text>
+            </Box>
           ) : uiState.warningMessage ? (
-            <Text color={theme.status.warning}>{uiState.warningMessage}</Text>
+            <Box flexDirection="row">
+              <Box width={isScreenReaderEnabled ? 11 : 3} flexShrink={0}>
+                <Text color={theme.status.warning}>
+                  {isScreenReaderEnabled ? SCREEN_READER_WARNING : WARNING_ICON}
+                </Text>
+              </Box>
+              <Text color={theme.status.warning}>{uiState.warningMessage}</Text>
+            </Box>
           ) : uiState.ctrlDPressedOnce ? (
-            <Text color={theme.status.warning}>
-              Press Ctrl+D again to exit.
-            </Text>
+            <Box flexDirection="row">
+              <Box width={isScreenReaderEnabled ? 11 : 3} flexShrink={0}>
+                <Text color={theme.status.warning}>
+                  {isScreenReaderEnabled ? SCREEN_READER_WARNING : WARNING_ICON}
+                </Text>
+              </Box>
+              <Text color={theme.status.warning}>
+                Press Ctrl+D again to exit.
+              </Text>
+            </Box>
           ) : uiState.showEscapePrompt ? (
-            <Text color={theme.text.secondary}>Press Esc again to clear.</Text>
+            <Box flexDirection="row">
+              <Box width={isScreenReaderEnabled ? 11 : 3} flexShrink={0}>
+                <Text color={theme.text.secondary}>
+                  {isScreenReaderEnabled ? SCREEN_READER_INFO : INFO_ICON}
+                </Text>
+              </Box>
+              <Text color={theme.text.secondary}>
+                Press Esc again to clear.
+              </Text>
+            </Box>
           ) : uiState.queueErrorMessage ? (
-            <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>
+            <Box flexDirection="row">
+              <Box width={isScreenReaderEnabled ? 11 : 3} flexShrink={0}>
+                <Text color={theme.status.error}>
+                  {isScreenReaderEnabled ? SCREEN_READER_ERROR : ERROR_ICON}
+                </Text>
+              </Box>
+              <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>
+            </Box>
           ) : (
             !settings.merged.ui?.hideContextSummary &&
             !hideContextSummary && (
