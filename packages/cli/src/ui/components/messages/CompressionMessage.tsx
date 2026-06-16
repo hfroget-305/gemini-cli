@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Text } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import type { CompressionProps } from '../../types.js';
 import { CliSpinner } from '../CliSpinner.js';
 import { theme } from '../../semantic-colors.js';
@@ -22,6 +22,7 @@ export interface CompressionDisplayProps {
 export function CompressionMessage({
   compression,
 }: CompressionDisplayProps): React.JSX.Element {
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
   const { isPending, originalTokenCount, newTokenCount, compressionStatus } =
     compression;
 
@@ -55,21 +56,26 @@ export function CompressionMessage({
 
   const text = getCompressionText();
 
+  const prefix = '✦ ';
+  const srPrefix = SCREEN_READER_MODEL_PREFIX;
+  const prefixWidth = isScreenReaderEnabled ? srPrefix.length : prefix.length;
+
   return (
     <Box flexDirection="row">
-      <Box marginRight={1}>
+      <Box width={prefixWidth} flexShrink={0}>
         {isPending ? (
           <CliSpinner type="dots" />
         ) : (
-          <Text color={theme.text.accent}>✦</Text>
+          <Text color={theme.text.accent}>
+            {isScreenReaderEnabled ? srPrefix : prefix}
+          </Text>
         )}
       </Box>
-      <Box>
+      <Box flexGrow={1}>
         <Text
           color={
             compression.isPending ? theme.text.accent : theme.status.success
           }
-          aria-label={SCREEN_READER_MODEL_PREFIX}
         >
           {text}
         </Text>
