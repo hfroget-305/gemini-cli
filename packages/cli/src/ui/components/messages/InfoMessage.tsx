@@ -8,7 +8,12 @@ import type React from 'react';
 import { Text, Box, useIsScreenReaderEnabled } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
-import { INFO_ICON, SCREEN_READER_INFO } from '../../textConstants.js';
+import {
+  INFO_ICON,
+  SCREEN_READER_INFO,
+  SCREEN_READER_PREFIX_WIDTH,
+  VISUAL_PREFIX_WIDTH,
+} from '../../textConstants.js';
 
 interface InfoMessageProps {
   text: string;
@@ -30,7 +35,9 @@ export const InfoMessage: React.FC<InfoMessageProps> = ({
   } else {
     prefix = (icon ?? INFO_ICON) + ' ';
   }
-  const prefixWidth = prefix.length;
+  const prefixWidth = isScreenReaderEnabled
+    ? SCREEN_READER_PREFIX_WIDTH
+    : VISUAL_PREFIX_WIDTH;
 
   return (
     <Box flexDirection="row" marginTop={1}>

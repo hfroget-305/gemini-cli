@@ -8,7 +8,12 @@ import type React from 'react';
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
-import { WARNING_ICON, SCREEN_READER_WARNING } from '../../textConstants.js';
+import {
+  WARNING_ICON,
+  SCREEN_READER_WARNING,
+  SCREEN_READER_PREFIX_WIDTH,
+  VISUAL_PREFIX_WIDTH,
+} from '../../textConstants.js';
 
 interface WarningMessageProps {
   text: string;
@@ -18,7 +23,9 @@ export const WarningMessage: React.FC<WarningMessageProps> = ({ text }) => {
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
   const icon = WARNING_ICON + ' ';
   const srPrefix = SCREEN_READER_WARNING;
-  const prefixWidth = isScreenReaderEnabled ? srPrefix.length : icon.length;
+  const prefixWidth = isScreenReaderEnabled
+    ? SCREEN_READER_PREFIX_WIDTH
+    : VISUAL_PREFIX_WIDTH;
 
   return (
     <Box flexDirection="row" marginTop={1}>
