@@ -26,7 +26,8 @@ concurrency:
 jobs:
   deflake_e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-ubuntu-16-core' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -116,7 +117,8 @@ jobs:
 
   deflake_e2e_windows:
     name: 'Slow E2E - Win'
-    runs-on: 'gemini-cli-windows-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-windows-16-core' || 'windows-latest' }}
 
     steps:
       - name: 'Checkout'

@@ -36,7 +36,8 @@ jobs:
   merge_queue_skipper:
     permissions: 'read-all'
     name: 'Merge Queue Skipper'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-ubuntu-16-core' || 'ubuntu-latest' }}
     outputs:
       skip: '${{ steps.merge-queue-ci-skipper.outputs.skip-check }}'
     steps:
@@ -47,7 +48,8 @@ jobs:
 
   lint:
     name: 'Lint'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-ubuntu-16-core' || 'ubuntu-latest' }}
     needs: 'merge_queue_skipper'
     if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     steps:
@@ -112,7 +114,8 @@ jobs:
           fail: true
   test_linux:
     name: 'Test (Linux)'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-ubuntu-16-core' || 'ubuntu-latest' }}
     needs:
       - 'lint'
       - 'merge_queue_skipper'
@@ -253,7 +256,8 @@ jobs:
 
   codeql:
     name: 'CodeQL'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-ubuntu-16-core' || 'ubuntu-latest' }}
     needs: 'merge_queue_skipper'
     if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     permissions:
@@ -279,7 +283,8 @@ jobs:
     name: 'Check Bundle Size'
     needs: 'merge_queue_skipper'
     if: "${{github.event_name == 'pull_request' && needs.merge_queue_skipper.outputs.skip == 'false'}}"
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-ubuntu-16-core' || 'ubuntu-latest' }}
     permissions:
       contents: 'read' # For checkout
       pull-requests: 'write' # For commenting
@@ -301,7 +306,8 @@ jobs:
 
   test_windows:
     name: 'Slow Test - Win'
-    runs-on: 'gemini-cli-windows-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-windows-16-core' || 'windows-latest' }}
     needs: 'merge_queue_skipper'
     if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     continue-on-error: true
@@ -376,7 +382,8 @@ jobs:
       - 'test_mac'
       - 'codeql'
       - 'bundle_size'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-ubuntu-16-core' || 'ubuntu-latest' }}
     steps:
       - name: 'Check all job results'
         run: |

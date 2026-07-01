@@ -36,7 +36,8 @@ jobs:
   merge_queue_skipper:
     name: 'Merge Queue Skipper'
     permissions: 'read-all'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-ubuntu-16-core' || 'ubuntu-latest' }}
     outputs:
       skip: '${{ steps.merge-queue-e2e-skipper.outputs.skip-check }}'
     steps:
@@ -48,7 +49,8 @@ jobs:
 
   parse_run_context:
     name: 'Parse run context'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-ubuntu-16-core' || 'ubuntu-latest' }}
     outputs:
       repository: '${{ steps.set_context.outputs.REPO }}'
       sha: '${{ steps.set_context.outputs.SHA }}'
@@ -77,7 +79,8 @@ jobs:
           printf 'SHA=%s\n' "$SHA" >> "$GITHUB_OUTPUT"
 
   set_pending_status:
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-ubuntu-16-core' || 'ubuntu-latest' }}
     permissions:
       statuses: 'write'
     needs:
@@ -99,7 +102,8 @@ jobs:
     needs:
       - 'merge_queue_skipper'
       - 'parse_run_context'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-ubuntu-16-core' || 'ubuntu-latest' }}
     if: |
       always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
     strategy:
@@ -200,7 +204,8 @@ jobs:
       - 'parse_run_context'
     if: |
       always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
-    runs-on: 'gemini-cli-windows-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-windows-16-core' || 'windows-latest' }}
     continue-on-error: true
 
     steps:
@@ -264,7 +269,8 @@ jobs:
       - 'e2e_linux'
       - 'e2e_mac'
       - 'merge_queue_skipper'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-ubuntu-16-core' || 'ubuntu-latest' }}
     steps:
       - name: 'Check E2E test results'
         env:
@@ -278,7 +284,8 @@ jobs:
           echo "All required E2E jobs passed!"
 
   set_workflow_status:
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-ubuntu-16-core' || 'ubuntu-latest' }}
     permissions:
       statuses: 'write'
     if: 'always()'
