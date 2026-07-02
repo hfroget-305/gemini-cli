@@ -1,24 +1,30 @@
 name: 'Testing: E2E (Chained)'
 
+# Trusted triggers only. The `workflow_run` trigger that consumed
+# `Trigger E2E` artifacts has been removed because it allowed fork PRs
+# to execute `npm run build` against a fork-controlled package.json on
+# a persistent self-hosted runner with access to GEMINI_API_KEY and the
+# robot PAT. Fork PRs now get e2e coverage only when a maintainer adds
+# them to the merge queue (the `merge_group` trigger below); for ad-hoc
+# pre-merge testing a maintainer can use `workflow_dispatch` and supply
+# the fork repo + SHA manually.
+
 on:
   push:
     branches:
       - 'main'
   merge_group:
-  workflow_run:
-    workflows: ['Trigger E2E']
-    types: ['completed']
   workflow_dispatch:
     inputs:
       head_sha:
-        description: 'SHA of the commit to test'
-        required: true
+        description: 'SHA of the commit to test (defaults to the dispatched ref)'
+        required: false
       repo_name:
-        description: 'Repository name (e.g., owner/repo)'
-        required: true
+        description: 'Repository in owner/repo form (defaults to this repo). Only set this if you have reviewed the fork code; it will run on a self-hosted runner with secrets.'
+        required: false
 
 concurrency:
-  group: '${{ github.workflow }}-${{ github.head_ref || github.event.workflow_run.head_branch || github.ref }}'
+  group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
   cancel-in-progress: |-
     ${{ github.event_name != 'push' && github.event_name != 'merge_group' }}
 
@@ -30,7 +36,8 @@ jobs:
   merge_queue_skipper:
     name: 'Merge Queue Skipper'
     permissions: 'read-all'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-ubuntu-16-core' || 'ubuntu-latest' }}
     outputs:
       skip: '${{ steps.merge-queue-e2e-skipper.outputs.skip-check }}'
     steps:
@@ -40,75 +47,42 @@ jobs:
           secret: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
     continue-on-error: true
 
-  download_repo_name:
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    if: "${{github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run'}}"
-    outputs:
-      repo_name: '${{ steps.output-repo-name.outputs.repo_name }}'
-      head_sha: '${{ steps.output-repo-name.outputs.head_sha }}'
-    steps:
-      - name: 'Mock Repo Artifact'
-        if: "${{ github.event_name == 'workflow_dispatch' }}"
-        env:
-          REPO_NAME: '${{ github.event.inputs.repo_name }}'
-        run: |
-          mkdir -p ./pr
-          echo '${{ env.REPO_NAME }}' > ./pr/repo_name
-      - uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
-        with:
-          name: 'repo_name'
-          path: 'pr/'
-      - name: 'Download the repo_name artifact'
-        uses: 'actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0' # ratchet:actions/download-artifact@v5
-        env:
-          RUN_ID: "${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || github.run_id  }}"
-        with:
-          github-token: '${{ secrets.GITHUB_TOKEN }}'
-          name: 'repo_name'
-          run-id: '${{ env.RUN_ID }}'
-          path: '${{ runner.temp }}/artifacts'
-      - name: 'Output Repo Name and SHA'
-        id: 'output-repo-name'
-        uses: 'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd' # ratchet:actions/github-script@v8
-        with:
-          github-token: '${{ secrets.GITHUB_TOKEN }}'
-          script: |
-            const fs = require('fs');
-            const path = require('path');
-            const temp = '${{ runner.temp }}/artifacts';
-            const repoPath = path.join(temp, 'repo_name');
-            if (fs.existsSync(repoPath)) {
-              const repo_name = String(fs.readFileSync(repoPath)).trim();
-              core.setOutput('repo_name', repo_name);
-            }
-            const shaPath = path.join(temp, 'head_sha');
-            if (fs.existsSync(shaPath)) {
-              const head_sha = String(fs.readFileSync(shaPath)).trim();
-              core.setOutput('head_sha', head_sha);
-            }
-
   parse_run_context:
     name: 'Parse run context'
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    needs: 'download_repo_name'
-    if: 'always()'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-ubuntu-16-core' || 'ubuntu-latest' }}
     outputs:
       repository: '${{ steps.set_context.outputs.REPO }}'
       sha: '${{ steps.set_context.outputs.SHA }}'
     steps:
       - id: 'set_context'
-        name: 'Set dynamic repository and SHA'
+        name: 'Set repository and SHA'
         env:
-          REPO: '${{ needs.download_repo_name.outputs.repo_name || github.repository }}'
-          SHA: '${{ needs.download_repo_name.outputs.head_sha || github.event.inputs.head_sha || github.event.workflow_run.head_sha || github.sha }}'
+          REPO: '${{ github.event.inputs.repo_name || github.repository }}'
+          SHA: '${{ github.event.inputs.head_sha || github.sha }}'
         shell: 'bash'
         run: |
-          echo "REPO=$REPO" >> "$GITHUB_OUTPUT"
-          echo "SHA=$SHA" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          # Validate before writing to $GITHUB_OUTPUT: a workflow_dispatch
+          # input containing a newline could otherwise inject extra
+          # outputs that downstream actions (checkout, status) would
+          # consume.
+          if [[ ! "$REPO" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
+            echo "::error::Invalid repo_name '$REPO' — must be owner/repo with [A-Za-z0-9._-] only."
+            exit 1
+          fi
+          if [[ ! "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Invalid SHA '$SHA' — must be 40 lowercase hex chars."
+            exit 1
+          fi
+          printf 'REPO=%s\n' "$REPO" >> "$GITHUB_OUTPUT"
+          printf 'SHA=%s\n' "$SHA" >> "$GITHUB_OUTPUT"
 
   set_pending_status:
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    permissions: 'write-all'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-ubuntu-16-core' || 'ubuntu-latest' }}
+    permissions:
+      statuses: 'write'
     needs:
       - 'parse_run_context'
     steps:
@@ -117,7 +91,7 @@ jobs:
         if: 'always()'
         with:
           allowForks: 'true'
-          repo: '${{ github.repository }}'
+          repo: '${{ needs.parse_run_context.outputs.repository }}'
           sha: '${{ needs.parse_run_context.outputs.sha }}'
           token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           status: 'pending'
@@ -128,7 +102,8 @@ jobs:
     needs:
       - 'merge_queue_skipper'
       - 'parse_run_context'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-ubuntu-16-core' || 'ubuntu-latest' }}
     if: |
       always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
     strategy:
@@ -151,9 +126,13 @@ jobs:
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
         with:
           node-version: '${{ matrix.node-version }}'
+          cache: 'npm'
 
       - name: 'Install dependencies'
-        run: 'npm ci'
+        # --ignore-scripts: defense-in-depth. Even for trusted triggers,
+        # blocking dependency lifecycle scripts limits blast radius if a
+        # compromised npm package lands in package-lock.json.
+        run: 'npm ci --ignore-scripts'
 
       - name: 'Build project'
         run: 'npm run build'
@@ -167,9 +146,10 @@ jobs:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           KEEP_OUTPUT: 'true'
           VERBOSE: 'true'
+          SANDBOX_MATRIX: '${{ matrix.sandbox }}'
         shell: 'bash'
         run: |
-          if [[ "${{ matrix.sandbox }}" == "sandbox:docker" ]]; then
+          if [[ "$SANDBOX_MATRIX" == "sandbox:docker" ]]; then
             npm run test:integration:sandbox:docker
           else
             npm run test:integration:sandbox:none
@@ -194,9 +174,12 @@ jobs:
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
         with:
           node-version: '20.x'
+          cache: 'npm'
 
       - name: 'Install dependencies'
-        run: 'npm ci'
+        # --ignore-scripts: defense-in-depth against malicious dependency
+        # lifecycle scripts.
+        run: 'npm ci --ignore-scripts'
 
       - name: 'Build project'
         run: 'npm run build'
@@ -221,9 +204,9 @@ jobs:
       - 'parse_run_context'
     if: |
       always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
-    runs-on: 'gemini-cli-windows-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-windows-16-core' || 'windows-latest' }}
     continue-on-error: true
-
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
@@ -256,7 +239,9 @@ jobs:
         shell: 'pwsh'
 
       - name: 'Install dependencies'
-        run: 'npm ci'
+        # --ignore-scripts: defense-in-depth against malicious dependency
+        # lifecycle scripts.
+        run: 'npm ci --ignore-scripts'
         shell: 'pwsh'
 
       - name: 'Build project'
@@ -283,20 +268,25 @@ jobs:
       - 'e2e_linux'
       - 'e2e_mac'
       - 'merge_queue_skipper'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-ubuntu-16-core' || 'ubuntu-latest' }}
     steps:
       - name: 'Check E2E test results'
+        env:
+          LINUX_RESULT: '${{ needs.e2e_linux.result }}'
+          MAC_RESULT: '${{ needs.e2e_mac.result }}'
         run: |
-          if [[ ${{ needs.e2e_linux.result }} != 'success' || \
-               ${{ needs.e2e_mac.result }} != 'success' ]]; then
+          if [[ "$LINUX_RESULT" != 'success' || "$MAC_RESULT" != 'success' ]]; then
             echo "One or more E2E jobs failed."
             exit 1
           fi
           echo "All required E2E jobs passed!"
 
   set_workflow_status:
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    permissions: 'write-all'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-ubuntu-16-core' || 'ubuntu-latest' }}
+    permissions:
+      statuses: 'write'
     if: 'always()'
     needs:
       - 'parse_run_context'
@@ -307,8 +297,11 @@ jobs:
         if: 'always()'
         with:
           allowForks: 'true'
-          repo: '${{ github.repository }}'
+          # Use the resolved repository (may be a fork for workflow_dispatch
+          # against an external SHA) and the robot PAT (the default
+          # GITHUB_TOKEN cannot write statuses across repos).
+          repo: '${{ needs.parse_run_context.outputs.repository }}'
           sha: '${{ needs.parse_run_context.outputs.sha }}'
-          token: '${{ secrets.GITHUB_TOKEN }}'
+          token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           status: '${{ needs.e2e.result }}'
           context: 'E2E (Chained)'

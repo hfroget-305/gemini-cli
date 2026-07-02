@@ -1,6 +1,8 @@
 # A2A `developer-profile` Extension — v0 Specification
 
-> **Status:** Stub — work in progress. See the [RFC](../../../../packages/a2a-server/development-extension-rfc.md) for the full design rationale. Open items are marked with `TODO`.
+> **Status:** Stub — work in progress. See the
+> [RFC](../../../../packages/a2a-server/development-extension-rfc.md) for the
+> full design rationale. Open items are marked with `TODO`.
 
 ---
 
@@ -27,16 +29,26 @@
 
 ## 1. Overview
 
-The `developer-profile` extension defines a communication contract layered on top of the [A2A protocol](https://a2a-protocol.org) (now a Linux Foundation standard) for rich, interactive development workflows between a client (IDE, editor, or other surface) and the Gemini CLI agent.
+The `developer-profile` extension defines a communication contract layered on
+top of the [A2A protocol](https://a2a-protocol.org) (now a Linux Foundation
+standard) for rich, interactive development workflows between a client (IDE,
+editor, or other surface) and the Gemini CLI agent.
 
 The extension introduces:
 
-- A session initialization schema (`AgentSettings`) carried in `Message.metadata`.
-- Structured schemas for agent-to-client streaming events: tool calls, thoughts, and state changes.
+- A session initialization schema (`AgentSettings`) carried in
+  `Message.metadata`.
+- Structured schemas for agent-to-client streaming events: tool calls, thoughts,
+  and state changes.
 - A client-to-agent confirmation schema for gated tool execution.
-- Two new JSON-RPC methods (`commands/get`, `command/execute`) for slash-command discovery and execution.
+- Two new JSON-RPC methods (`commands/get`, `command/execute`) for slash-command
+  discovery and execution.
 
-> **Note on naming:** The RFC refers to this extension as `development-tool`; the canonical identifier used in the Agent Card URI (and therefore by clients for version negotiation) is `developer-profile`. These names should be reconciled before the spec exits draft status. See [open issue §9](#9-open-issues).
+> **Note on naming:** The RFC refers to this extension as `development-tool`;
+> the canonical identifier used in the Agent Card URI (and therefore by clients
+> for version negotiation) is `developer-profile`. These names should be
+> reconciled before the spec exits draft status. See
+> [open issue §9](#9-open-issues).
 
 ---
 
@@ -50,16 +62,23 @@ https://github.com/google-gemini/gemini-cli/blob/main/docs/a2a/developer-profile
                                                                                     version path segment
 ```
 
-**Compatibility rules** (following [Semantic Versioning 2.0.0](https://semver.org)):
+**Compatibility rules** (following
+[Semantic Versioning 2.0.0](https://semver.org)):
 
-| Change type | Version impact | Example |
-|---|---|---|
+| Change type                    | Version impact                     | Example                                  |
+| ------------------------------ | ---------------------------------- | ---------------------------------------- |
 | Backwards-compatible additions | Minor/patch — same `v<major>` path | New optional field in an existing schema |
-| Breaking changes | New major path segment | `v0` → `v1` |
+| Breaking changes               | New major path segment             | `v0` → `v1`                              |
 
-A client MUST extract the version segment from the URI and apply semver compatibility logic before connecting. If the client does not support the advertised major version it MUST refuse the connection and surface a meaningful error.
+A client MUST extract the version segment from the URI and apply semver
+compatibility logic before connecting. If the client does not support the
+advertised major version it MUST refuse the connection and surface a meaningful
+error.
 
-> **TODO:** Define exact semver ranges clients should accept (e.g. `>=0.1.0 <1.0.0`). During `v0` the spec is explicitly unstable and breaking changes may occur without a major bump — clients should treat `v0` as a pre-release.
+> **TODO:** Define exact semver ranges clients should accept (e.g.
+> `>=0.1.0 <1.0.0`). During `v0` the spec is explicitly unstable and breaking
+> changes may occur without a major bump — clients should treat `v0` as a
+> pre-release.
 
 ---
 
@@ -84,9 +103,11 @@ An agent that implements this extension MUST advertise it in its A2A Agent Card:
 }
 ```
 
-The `required: true` field signals that clients which do not support this extension MUST NOT attempt to communicate with the agent.
+The `required: true` field signals that clients which do not support this
+extension MUST NOT attempt to communicate with the agent.
 
-All custom objects placed in any A2A `metadata` field MUST be keyed by this URI to prevent naming collisions with other extensions:
+All custom objects placed in any A2A `metadata` field MUST be keyed by this URI
+to prevent naming collisions with other extensions:
 
 ```json
 {
@@ -103,13 +124,16 @@ All custom objects placed in any A2A `metadata` field MUST be keyed by this URI 
 
 ## 4. Session initialization
 
-The **first** `message/stream` request in a session MUST include an `AgentSettings` object in `Message.metadata` (keyed by the extension URI). Subsequent messages in the same session do not need to repeat it.
+The **first** `message/stream` request in a session MUST include an
+`AgentSettings` object in `Message.metadata` (keyed by the extension URI).
+Subsequent messages in the same session do not need to repeat it.
 
 ---
 
 ## 5. Schema definitions
 
-All schemas are expressed in proto3 syntax for precision. Wire format is JSON (following A2A conventions) unless otherwise noted.
+All schemas are expressed in proto3 syntax for precision. Wire format is JSON
+(following A2A conventions) unless otherwise noted.
 
 ### 5.1 AgentSettings
 
@@ -131,7 +155,9 @@ message AgentSettings {
 
 ### 5.2 ToolCall
 
-The central schema for representing a tool's full execution lifecycle. The agent sends the **entire object** on every state change — clients are intentionally kept stateless.
+The central schema for representing a tool's full execution lifecycle. The agent
+sends the **entire object** on every state change — clients are intentionally
+kept stateless.
 
 ```proto
 syntax = "proto3";
@@ -258,7 +284,8 @@ message AgentThought {
 
 ### 5.4 DevelopmentToolEvent
 
-Carried in `TaskStatusUpdateEvent.metadata` (keyed by the extension URI) so clients can deserialize the accompanying `Message` correctly.
+Carried in `TaskStatusUpdateEvent.metadata` (keyed by the extension URI) so
+clients can deserialize the accompanying `Message` correctly.
 
 ```proto
 syntax = "proto3";
@@ -282,7 +309,9 @@ message DevelopmentToolEvent {
 
 ### 5.5 ToolCallConfirmation
 
-Sent by the client in response to a `ConfirmationRequest`. Must be included in a new `message/stream` request that carries the same `contextId` and `taskId` as the paused task.
+Sent by the client in response to a `ConfirmationRequest`. Must be included in a
+new `message/stream` request that carries the same `contextId` and `taskId` as
+the paused task.
 
 ```proto
 syntax = "proto3";
@@ -308,7 +337,9 @@ message ModifiedFileDetails {
 
 ### 6.1 `commands/get`
 
-Allows the client to discover all slash commands the agent supports. Clients SHOULD call this once during startup to dynamically populate their command palette.
+Allows the client to discover all slash commands the agent supports. Clients
+SHOULD call this once during startup to dynamically populate their command
+palette.
 
 **Request:** _(no parameters)_
 
@@ -335,7 +366,9 @@ message SlashCommandArgument {
 
 ### 6.2 `command/execute`
 
-Executes a slash command. After the initial response, all subsequent output is delivered as `TaskStatusUpdateEvent` messages over the standard A2A streaming channel using the schemas defined in §5.
+Executes a slash command. After the initial response, all subsequent output is
+delivered as `TaskStatusUpdateEvent` messages over the standard A2A streaming
+channel using the schemas defined in §5.
 
 **Request:**
 
@@ -370,17 +403,27 @@ message ExecuteSlashCommandResponse {
 
 ## 7. Communication flow
 
-The full interaction follows the A2A task-based streaming pattern. A worked example:
+The full interaction follows the A2A task-based streaming pattern. A worked
+example:
 
 1. **Client → Server** — `message/stream` with `AgentSettings` in metadata.
-2. **Server → Client** — SSE stream opens; server sends a `Task` with `status.state: submitted`, then a `TaskStatusUpdateEvent` with `kind: STATE_CHANGE` and `status.state: working`.
+2. **Server → Client** — SSE stream opens; server sends a `Task` with
+   `status.state: submitted`, then a `TaskStatusUpdateEvent` with
+   `kind: STATE_CHANGE` and `status.state: working`.
 3. Agent decides to call a tool requiring confirmation.
-4. **Server → Client** — `TaskStatusUpdateEvent` with `kind: TOOL_CALL_UPDATE` and `ToolCall.status: PENDING` (confirmation_request populated), followed by a final `TaskStatusUpdateEvent` with `kind: STATE_CHANGE`, `status.state: input-required`, `final: true`. Stream ends.
+4. **Server → Client** — `TaskStatusUpdateEvent` with `kind: TOOL_CALL_UPDATE`
+   and `ToolCall.status: PENDING` (confirmation_request populated), followed by
+   a final `TaskStatusUpdateEvent` with `kind: STATE_CHANGE`,
+   `status.state: input-required`, `final: true`. Stream ends.
 5. **Client** — renders confirmation UI; user approves.
-6. **Client → Server** — new `message/stream` with same `taskId` and `ToolCallConfirmation` in a `DataPart`.
-7. **Server → Client** — new SSE stream; events with `kind: TOOL_CALL_UPDATE` as the tool moves through `EXECUTING` → `SUCCEEDED`.
+6. **Client → Server** — new `message/stream` with same `taskId` and
+   `ToolCallConfirmation` in a `DataPart`.
+7. **Server → Client** — new SSE stream; events with `kind: TOOL_CALL_UPDATE` as
+   the tool moves through `EXECUTING` → `SUCCEEDED`.
 8. Agent generates a final response.
-9. **Server → Client** — `TaskStatusUpdateEvent` with `kind: TEXT_CONTENT` (agent's text), then a final event with `kind: STATE_CHANGE`, `status.state: completed`, `final: true`.
+9. **Server → Client** — `TaskStatusUpdateEvent` with `kind: TEXT_CONTENT`
+   (agent's text), then a final event with `kind: STATE_CHANGE`,
+   `status.state: completed`, `final: true`.
 
 > **TODO:** Provide a formal sequence diagram.
 
@@ -388,17 +431,21 @@ The full interaction follows the A2A task-based streaming pattern. A worked exam
 
 ## 8. Separation of concerns
 
-All **client-side context** (e.g. workspace state, open buffers) and **client-side tool execution** (e.g. reading active editor buffers) MUST be routed through MCP. The `developer-profile` A2A extension is the authoritative channel for agent communication only. This enforces a strict boundary: A2A carries agent output, MCP carries client capabilities.
+All **client-side context** (e.g. workspace state, open buffers) and
+**client-side tool execution** (e.g. reading active editor buffers) MUST be
+routed through MCP. The `developer-profile` A2A extension is the authoritative
+channel for agent communication only. This enforces a strict boundary: A2A
+carries agent output, MCP carries client capabilities.
 
 ---
 
 ## 9. Open issues
 
-| # | Issue | Status |
-|---|---|---|
-| 1 | **Name inconsistency** — RFC uses `development-tool`; URI uses `developer-profile`. Decide on a canonical name and update both. | Open |
-| 2 | **v0 stability guarantee** — Define whether `v0` follows standard semver pre-release rules or a lighter-weight "breaking changes allowed at any time" policy. | Open |
-| 3 | **Proto vs JSON schema** — Decide whether proto3 is the normative format or whether JSON Schema definitions are needed alongside. | Open |
-| 4 | **Metadata key format** — Confirm the exact string clients must use as a key in `metadata` objects (full URI vs a shorter alias). | Open |
-| 5 | **`commands/get` auth** — Specify whether the method requires an authenticated session or can be called before `AgentSettings` is sent. | Open |
-| 6 | **Sequence diagram** — Add a formal sequence diagram for the §7 communication flow. | Open |
+| #   | Issue                                                                                                                                                         | Status |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 1   | **Name inconsistency** — RFC uses `development-tool`; URI uses `developer-profile`. Decide on a canonical name and update both.                               | Open   |
+| 2   | **v0 stability guarantee** — Define whether `v0` follows standard semver pre-release rules or a lighter-weight "breaking changes allowed at any time" policy. | Open   |
+| 3   | **Proto vs JSON schema** — Decide whether proto3 is the normative format or whether JSON Schema definitions are needed alongside.                             | Open   |
+| 4   | **Metadata key format** — Confirm the exact string clients must use as a key in `metadata` objects (full URI vs a shorter alias).                             | Open   |
+| 5   | **`commands/get` auth** — Specify whether the method requires an authenticated session or can be called before `AgentSettings` is sent.                       | Open   |
+| 6   | **Sequence diagram** — Add a formal sequence diagram for the §7 communication flow.                                                                           | Open   |

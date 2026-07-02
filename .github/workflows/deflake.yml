@@ -26,7 +26,8 @@ concurrency:
 jobs:
   deflake_e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
-    runs-on: 'gemini-cli-ubuntu-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-ubuntu-16-core' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -47,6 +48,7 @@ jobs:
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
         with:
           node-version: '${{ matrix.node-version }}'
+          cache: 'npm'
 
       - name: 'Install dependencies'
         run: 'npm ci'
@@ -68,10 +70,10 @@ jobs:
           VERBOSE: 'true'
         shell: 'bash'
         run: |
-          if [[ "${{ env.IS_DOCKER }}" == "true" ]]; then
-            npm run deflake:test:integration:sandbox:docker -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
+          if [[ "$IS_DOCKER" == "true" ]]; then
+            npm run deflake:test:integration:sandbox:docker -- --runs="$RUNS" -- --testNamePattern "$TEST_NAME_PATTERN"
           else
-            npm run deflake:test:integration:sandbox:none -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
+            npm run deflake:test:integration:sandbox:none -- --runs="$RUNS" -- --testNamePattern "$TEST_NAME_PATTERN"
           fi
 
   deflake_e2e_mac:
@@ -88,6 +90,7 @@ jobs:
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
         with:
           node-version: '20.x'
+          cache: 'npm'
 
       - name: 'Install dependencies'
         run: 'npm ci'
@@ -108,12 +111,14 @@ jobs:
           SANDBOX: 'sandbox:none'
           TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
           VERBOSE: 'true'
+        shell: 'bash'
         run: |
-          npm run deflake:test:integration:sandbox:none -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
+          npm run deflake:test:integration:sandbox:none -- --runs="$RUNS" -- --testNamePattern "$TEST_NAME_PATTERN"
 
   deflake_e2e_windows:
     name: 'Slow E2E - Win'
-    runs-on: 'gemini-cli-windows-16-core'
+    runs-on: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' && 'gemini-cli-windows-16-core' || 'windows-latest' }}
 
     steps:
       - name: 'Checkout'
@@ -167,4 +172,4 @@ jobs:
           TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
         shell: 'pwsh'
         run: |
-          npm run deflake:test:integration:sandbox:none -- --runs="${{ env.RUNS }}" -- --testNamePattern "'${{ env.TEST_NAME_PATTERN }}'"
+          npm run deflake:test:integration:sandbox:none -- --runs="$env:RUNS" -- --testNamePattern "$env:TEST_NAME_PATTERN"

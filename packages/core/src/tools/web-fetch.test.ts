@@ -43,8 +43,19 @@ vi.mock('../utils/fetch.js', async (importOriginal) => {
   return {
     ...actual,
     fetchWithTimeout: vi.fn(),
+    fetchPinned: vi.fn(),
     isPrivateIp: vi.fn(),
+    isPrivateUrl: vi.fn(),
+    resolveUrl: vi.fn(),
   };
+});
+
+// Helpers to keep the test bodies short.
+const mockResolution = (isPrivate: boolean) => ({
+  hostname: 'mock.test',
+  resolvedAddress: '1.2.3.4',
+  family: 4 as const,
+  isPrivate,
 });
 
 vi.mock('node:crypto', () => ({
@@ -177,8 +188,10 @@ describe('WebFetchTool', () => {
 
   describe('execute', () => {
     it('should return WEB_FETCH_FALLBACK_FAILED on fallback fetch failure', async () => {
-      vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(true);
-      vi.spyOn(fetchUtils, 'fetchWithTimeout').mockRejectedValue(
+      vi.spyOn(fetchUtils, 'resolveUrl').mockResolvedValue(
+        mockResolution(true),
+      );
+      vi.spyOn(fetchUtils, 'fetchPinned').mockRejectedValue(
         new Error('fetch failed'),
       );
       const tool = new WebFetchTool(mockConfig);
@@ -189,7 +202,9 @@ describe('WebFetchTool', () => {
     });
 
     it('should return WEB_FETCH_PROCESSING_ERROR on general processing failure', async () => {
-      vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(false);
+      vi.spyOn(fetchUtils, 'resolveUrl').mockResolvedValue(
+        mockResolution(false),
+      );
       mockGenerateContent.mockRejectedValue(new Error('API error'));
       const tool = new WebFetchTool(mockConfig);
       const params = { prompt: 'fetch https://public.ip' };
@@ -199,9 +214,11 @@ describe('WebFetchTool', () => {
     });
 
     it('should log telemetry when falling back due to private IP', async () => {
-      vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(true);
+      vi.spyOn(fetchUtils, 'resolveUrl').mockResolvedValue(
+        mockResolution(true),
+      );
       // Mock fetchWithTimeout to succeed so fallback proceeds
-      vi.spyOn(fetchUtils, 'fetchWithTimeout').mockResolvedValue({
+      vi.spyOn(fetchUtils, 'fetchPinned').mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('some content'),
       } as Response);
@@ -222,13 +239,15 @@ describe('WebFetchTool', () => {
     });
 
     it('should log telemetry when falling back due to primary fetch failure', async () => {
-      vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(false);
+      vi.spyOn(fetchUtils, 'resolveUrl').mockResolvedValue(
+        mockResolution(false),
+      );
       // Mock primary fetch to return empty response, triggering fallback
       mockGenerateContent.mockResolvedValueOnce({
         candidates: [],
       });
       // Mock fetchWithTimeout to succeed so fallback proceeds
-      vi.spyOn(fetchUtils, 'fetchWithTimeout').mockResolvedValue({
+      vi.spyOn(fetchUtils, 'fetchPinned').mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('some content'),
       } as Response);
@@ -255,7 +274,9 @@ describe('WebFetchTool', () => {
   describe('execute (fallback)', () => {
     beforeEach(() => {
       // Force fallback by mocking primary fetch to fail
-      vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(false);
+      vi.spyOn(fetchUtils, 'resolveUrl').mockResolvedValue(
+        mockResolution(false),
+      );
       mockGenerateContent.mockResolvedValueOnce({
         candidates: [],
       });
@@ -293,7 +314,7 @@ describe('WebFetchTool', () => {
           ? new Headers({ 'content-type': contentType })
           : new Headers();
 
-        vi.spyOn(fetchUtils, 'fetchWithTimeout').mockResolvedValue({
+        vi.spyOn(fetchUtils, 'fetchPinned').mockResolvedValue({
           ok: true,
           headers,
           text: () => Promise.resolve(content),
@@ -557,7 +578,9 @@ describe('WebFetchTool', () => {
     });
 
     it('should execute normally after confirmation approval', async () => {
-      vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(false);
+      vi.spyOn(fetchUtils, 'resolveUrl').mockResolvedValue(
+        mockResolution(false),
+      );
       mockGenerateContent.mockResolvedValue({
         candidates: [
           {

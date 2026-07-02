@@ -446,7 +446,7 @@ sandbox.
 We publish an artifact for each commit to our internal registry. But if you need
 to manually cut a local build, then run the following commands:
 
-```
+```bash
 npm run clean
 npm install
 npm run auth
@@ -482,8 +482,8 @@ code.
 
 ### Documentation structure
 
-Our documentation is organized using [sidebar.json](./sidebar.json) as the
-table of contents. When adding new documentation:
+Our documentation is organized using [sidebar.json](./sidebar.json) as the table
+of contents. When adding new documentation:
 
 1. Create your markdown file **in the appropriate directory** under `/docs`.
 2. Add an entry to `sidebar.json` in the relevant section.

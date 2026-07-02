@@ -20,4 +20,9 @@ jobs:
         id: 'lychee'
         uses: 'lycheeverse/lychee-action@885c65f3dc543b57c898c8099f4e08c8afd178a2' # ratchet: lycheeverse/lychee-action@v2.6.1
         with:
-          args: '--verbose --no-progress --accept 200,503 ./**/*.md'
+          # docs/CONTRIBUTING.md is a symlink to ../CONTRIBUTING.md. Lychee
+          # resolves relative links from the symlink's directory, so links
+          # like docs/integration-tests.md become docs/docs/integration-tests.md
+          # and fail. Skip the symlink; the underlying root file is still
+          # checked via the same glob.
+          args: '--verbose --no-progress --accept 200,503 --exclude-path docs/CONTRIBUTING.md ./**/*.md'

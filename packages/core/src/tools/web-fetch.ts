@@ -21,7 +21,7 @@ import { getErrorMessage } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import { getResponseText } from '../utils/partUtils.js';
-import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
+import { fetchPinned, resolveUrl, type UrlResolution } from '../utils/fetch.js';
 import { convert } from 'html-to-text';
 import {
   logWebFetchFallbackAttempt,
@@ -33,6 +33,83 @@ import { retryWithBackoff } from '../utils/retry.js';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
+// Cap on the raw response body we will buffer before truncating to
+// MAX_CONTENT_LENGTH for the model. Generous enough for real pages,
+// strict enough to prevent OOM on a malicious or accidental large body.
+const MAX_RESPONSE_BYTES = 10 * 1024 * 1024; // 10 MiB
+
+/**
+ * Rewrite a github.com /blob/ URL to its raw.githubusercontent.com
+ * equivalent. Uses URL parsing — substring matching is unsafe because
+ * "github.com" can appear in a path or in attacker-controlled hostnames
+ * like `github.com.evil.tld`.
+ */
+function maybeRewriteGithubBlobUrl(input: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(input);
+  } catch {
+    return input;
+  }
+  if (parsed.hostname !== 'github.com') return input;
+  if (!parsed.pathname.includes('/blob/')) return input;
+  parsed.hostname = 'raw.githubusercontent.com';
+  parsed.pathname = parsed.pathname.replace('/blob/', '/');
+  return parsed.toString();
+}
+
+/**
+ * Read at most `maxBytes` bytes of a response body. Refuses up-front
+ * if the Content-Length header advertises a body larger than the cap.
+ * Streams when `response.body` is available; otherwise falls back to
+ * `response.text()` and truncates after the fact.
+ */
+async function readResponseBodyBounded(
+  response: Response,
+  maxBytes: number,
+): Promise<string> {
+  const contentLength = response.headers.get('content-length');
+  if (contentLength) {
+    const advertised = Number(contentLength);
+    if (Number.isFinite(advertised) && advertised > maxBytes) {
+      throw new Error(
+        `Response Content-Length (${advertised}) exceeds limit of ${maxBytes} bytes`,
+      );
+    }
+  }
+  if (response.body) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8', { fatal: false });
+    const chunks: string[] = [];
+    let received = 0;
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      if (received > maxBytes) {
+        await reader.cancel();
+        chunks.push(
+          decoder.decode(
+            value.subarray(0, value.byteLength - (received - maxBytes)),
+          ),
+        );
+        break;
+      }
+      chunks.push(decoder.decode(value, { stream: true }));
+    }
+    chunks.push(decoder.decode());
+    return chunks.join('');
+  }
+  // Fallback when response.body is unavailable. In production Node
+  // (>= 18) fetch always provides body; this branch exists for test
+  // mocks and exotic runtimes. We still truncate by BYTES (not code
+  // units) so multi-byte UTF-8 content respects the maxBytes cap.
+  const text = await response.text();
+  const buf = Buffer.from(text, 'utf8');
+  return buf.byteLength > maxBytes
+    ? buf.subarray(0, maxBytes).toString('utf8')
+    : text;
+}
 
 /**
  * Parses a prompt to extract valid URLs and identify malformed ones.
@@ -121,22 +198,39 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     super(params, messageBus, _toolName, _toolDisplayName);
   }
 
-  private async executeFallback(signal: AbortSignal): Promise<ToolResult> {
-    const { validUrls: urls } = parsePrompt(this.params.prompt);
-    // For now, we only support one URL for fallback
-    let url = urls[0];
+  private async executeFallback(
+    signal: AbortSignal,
+    preFetched?: { url: string; resolution: UrlResolution },
+  ): Promise<ToolResult> {
+    let url: string;
+    let resolution: UrlResolution | null;
+    if (preFetched) {
+      url = preFetched.url;
+      resolution = preFetched.resolution;
+    } else {
+      const { validUrls: urls } = parsePrompt(this.params.prompt);
+      // For now, we only support one URL for fallback
+      url = maybeRewriteGithubBlobUrl(urls[0]);
+      resolution = await resolveUrl(url);
+    }
 
-    // Convert GitHub blob URL to raw URL
-    if (url.includes('github.com') && url.includes('/blob/')) {
-      url = url
-        .replace('github.com', 'raw.githubusercontent.com')
-        .replace('/blob/', '/');
+    // SSRF guard: refuse anything that resolves to a private/loopback/
+    // metadata address. The actual connection will be pinned to
+    // resolution.resolvedAddress via fetchPinned so a DNS rebind cannot
+    // change the destination between this check and the connection.
+    if (!resolution || resolution.isPrivate) {
+      const msg = `Refusing to fetch ${url}: resolves to a private, loopback, or metadata address.`;
+      return {
+        llmContent: `Error: ${msg}`,
+        returnDisplay: `Error: ${msg}`,
+        error: { message: msg, type: ToolErrorType.WEB_FETCH_FALLBACK_FAILED },
+      };
     }
 
     try {
       const response = await retryWithBackoff(
         async () => {
-          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS);
+          const res = await fetchPinned(url, resolution!, URL_FETCH_TIMEOUT_MS);
           if (!res.ok) {
             const error = new Error(
               `Request failed with status code ${res.status} ${res.statusText}`,
@@ -151,7 +245,10 @@ class WebFetchToolInvocation extends BaseToolInvocation<
         },
       );
 
-      const rawContent = await response.text();
+      const rawContent = await readResponseBodyBounded(
+        response,
+        MAX_RESPONSE_BYTES,
+      );
       const contentType = response.headers.get('content-type') || '';
       let textContent: string;
 
@@ -226,14 +323,7 @@ ${textContent}
     // Perform GitHub URL conversion here to differentiate between user-provided
     // URL and the actual URL to be fetched.
     const { validUrls } = parsePrompt(this.params.prompt);
-    const urls = validUrls.map((url) => {
-      if (url.includes('github.com') && url.includes('/blob/')) {
-        return url
-          .replace('github.com', 'raw.githubusercontent.com')
-          .replace('/blob/', '/');
-      }
-      return url;
-    });
+    const urls = validUrls.map(maybeRewriteGithubBlobUrl);
 
     const confirmationDetails: ToolCallConfirmationDetails = {
       type: 'info',
@@ -252,15 +342,30 @@ ${textContent}
   async execute(signal: AbortSignal): Promise<ToolResult> {
     const userPrompt = this.params.prompt;
     const { validUrls: urls } = parsePrompt(userPrompt);
-    const url = urls[0];
-    const isPrivate = isPrivateIp(url);
+    const rawUrl = urls[0];
+    // Rewrite + resolve once. The resolution is reused if we end up on
+    // the fallback path so we don't pay another DNS lookup, and it pins
+    // the eventual connection to the IP we just verified.
+    const rewrittenUrl = maybeRewriteGithubBlobUrl(rawUrl);
+    const resolution = await resolveUrl(rewrittenUrl);
 
-    if (isPrivate) {
+    if (!resolution || resolution.isPrivate) {
       logWebFetchFallbackAttempt(
         this.config,
         new WebFetchFallbackAttemptEvent('private_ip'),
       );
-      return this.executeFallback(signal);
+      const msg =
+        `Refusing to fetch ${rawUrl}: hostname resolves to a private, ` +
+        `loopback, or cloud-metadata address. This is blocked to prevent ` +
+        `SSRF (server-side request forgery) leaking internal data.`;
+      return {
+        llmContent: `Error: ${msg}`,
+        returnDisplay: `Error: ${msg}`,
+        error: {
+          message: msg,
+          type: ToolErrorType.WEB_FETCH_FALLBACK_FAILED,
+        },
+      };
     }
 
     const geminiClient = this.config.getGeminiClient();
@@ -322,7 +427,11 @@ ${textContent}
           this.config,
           new WebFetchFallbackAttemptEvent('primary_failed'),
         );
-        return await this.executeFallback(signal);
+        // Reuse the URL + resolution computed at the top of execute().
+        return await this.executeFallback(signal, {
+          url: rewrittenUrl,
+          resolution,
+        });
       }
 
       const sourceListFormatted: string[] = [];

