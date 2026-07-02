@@ -188,7 +188,9 @@ describe('WebFetchTool', () => {
 
   describe('execute', () => {
     it('should return WEB_FETCH_FALLBACK_FAILED on fallback fetch failure', async () => {
-      vi.spyOn(fetchUtils, 'resolveUrl').mockResolvedValue(mockResolution(true));
+      vi.spyOn(fetchUtils, 'resolveUrl').mockResolvedValue(
+        mockResolution(true),
+      );
       vi.spyOn(fetchUtils, 'fetchPinned').mockRejectedValue(
         new Error('fetch failed'),
       );
@@ -200,7 +202,9 @@ describe('WebFetchTool', () => {
     });
 
     it('should return WEB_FETCH_PROCESSING_ERROR on general processing failure', async () => {
-      vi.spyOn(fetchUtils, 'resolveUrl').mockResolvedValue(mockResolution(false));
+      vi.spyOn(fetchUtils, 'resolveUrl').mockResolvedValue(
+        mockResolution(false),
+      );
       mockGenerateContent.mockRejectedValue(new Error('API error'));
       const tool = new WebFetchTool(mockConfig);
       const params = { prompt: 'fetch https://public.ip' };
@@ -210,7 +214,9 @@ describe('WebFetchTool', () => {
     });
 
     it('should log telemetry when falling back due to private IP', async () => {
-      vi.spyOn(fetchUtils, 'resolveUrl').mockResolvedValue(mockResolution(true));
+      vi.spyOn(fetchUtils, 'resolveUrl').mockResolvedValue(
+        mockResolution(true),
+      );
       // Mock fetchWithTimeout to succeed so fallback proceeds
       vi.spyOn(fetchUtils, 'fetchPinned').mockResolvedValue({
         ok: true,
@@ -233,7 +239,9 @@ describe('WebFetchTool', () => {
     });
 
     it('should log telemetry when falling back due to primary fetch failure', async () => {
-      vi.spyOn(fetchUtils, 'resolveUrl').mockResolvedValue(mockResolution(false));
+      vi.spyOn(fetchUtils, 'resolveUrl').mockResolvedValue(
+        mockResolution(false),
+      );
       // Mock primary fetch to return empty response, triggering fallback
       mockGenerateContent.mockResolvedValueOnce({
         candidates: [],
@@ -266,7 +274,9 @@ describe('WebFetchTool', () => {
   describe('execute (fallback)', () => {
     beforeEach(() => {
       // Force fallback by mocking primary fetch to fail
-      vi.spyOn(fetchUtils, 'resolveUrl').mockResolvedValue(mockResolution(false));
+      vi.spyOn(fetchUtils, 'resolveUrl').mockResolvedValue(
+        mockResolution(false),
+      );
       mockGenerateContent.mockResolvedValueOnce({
         candidates: [],
       });
@@ -568,7 +578,9 @@ describe('WebFetchTool', () => {
     });
 
     it('should execute normally after confirmation approval', async () => {
-      vi.spyOn(fetchUtils, 'resolveUrl').mockResolvedValue(mockResolution(false));
+      vi.spyOn(fetchUtils, 'resolveUrl').mockResolvedValue(
+        mockResolution(false),
+      );
       mockGenerateContent.mockResolvedValue({
         candidates: [
           {
