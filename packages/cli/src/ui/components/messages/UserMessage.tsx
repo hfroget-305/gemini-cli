@@ -5,9 +5,13 @@
  */
 
 import type React from 'react';
-import { Text, Box } from 'ink';
+import { Text, Box, useIsScreenReaderEnabled } from 'ink';
 import { theme } from '../../semantic-colors.js';
-import { SCREEN_READER_USER_PREFIX } from '../../textConstants.js';
+import {
+  SCREEN_READER_USER_PREFIX,
+  VISUAL_PREFIX_WIDTH,
+  SCREEN_READER_PREFIX_WIDTH,
+} from '../../textConstants.js';
 import { isSlashCommand as checkIsSlashCommand } from '../../utils/commandUtils.js';
 
 interface UserMessageProps {
@@ -16,8 +20,12 @@ interface UserMessageProps {
 }
 
 export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
   const prefix = '> ';
-  const prefixWidth = prefix.length;
+  const srPrefix = SCREEN_READER_USER_PREFIX;
+  const prefixWidth = isScreenReaderEnabled
+    ? SCREEN_READER_PREFIX_WIDTH
+    : VISUAL_PREFIX_WIDTH;
   const isSlashCommand = checkIsSlashCommand(text);
 
   const textColor = isSlashCommand ? theme.text.accent : theme.text.secondary;
@@ -31,8 +39,8 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
       width={width}
     >
       <Box width={prefixWidth} flexShrink={0}>
-        <Text color={theme.text.accent} aria-label={SCREEN_READER_USER_PREFIX}>
-          {prefix}
+        <Text color={theme.text.accent}>
+          {isScreenReaderEnabled ? srPrefix : prefix}
         </Text>
       </Box>
       <Box flexGrow={1}>
