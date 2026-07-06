@@ -5,6 +5,30 @@ Last full sweep: 2026-07-02
 Scope: complete inventory of the `hfiiii.app.n8n.cloud` instance —
 workflows (active/inactive), credentials, data tables, execution history.
 
+## ✅ Applied and live — 2026-07-06
+
+All five MCP-accessible workflows were hardened via `update_workflow` and
+**published** (verified by reading back the active versions):
+
+| Workflow | Active version | What went live |
+|---|---|---|
+| `uAEmLyjUHjh0IiEu` After-Hours Intake | `ce402399…` | Zoho criteria escaping · `SMS Allowlist Check` (only `+1` NANP numbers with a matching Zoho Contact reach Telnyx) · retry on all 5 HTTP nodes · `Verify Secret` gate (disabled) → `Unauthorized (drop)` · STOP opt-out shipped |
+| `VDPm65jUXYgIGKlI` CS Agent | `bb53ed3d…` | `Safe Email` validate/escape · Contact-field allowlist to Anthropic · `<<<VISITOR>>>` delimiters + system-prompt rule · 4 000-char output caps · `Not Started` typo fix · retries · `Verify Secret` gate (disabled) → `Respond 401` |
+| `kdAA38uPRH6QxeXr` Synthflow capture | `f160661d…` | renamed `… (capture — remove after 2026-08-01)` · `Verify Secret` gate (disabled) → drop |
+| `eBshd1k5ucLWJWs6` Hot Lead Alert | `41555ff8…` | escaped-HTML email body · retry on the Zoho poll |
+| `5UMcYzORF4nigho7` Weekly Queue Report | `831771b0…` | escaped-HTML report body (`wvq-005`) |
+
+**The three `Verify Secret` gates are intentionally DISABLED** (pass-through)
+so live traffic is not dropped before the providers send the header. To
+enforce, follow `docs/security/patches/webhook-auth-shared-secret.md`:
+set the `TC_WEBHOOK_SECRET` n8n Variable, add the `X-TC-Secret` header on
+ElevenLabs / SalesIQ / Synthflow, then enable each node.
+
+Still open (not automatable from here): rotate the 3 leaked LLM keys (§1),
+delete the 2 orphaned credentials (§2), per-workflow success-retention off
++ instance retention/redaction (§8), and toggle *Available in MCP* on the 4
+still-locked workflows (§7).
+
 ## What changed since the last review
 
 The instance is much smaller and healthier than in the May snapshot.
