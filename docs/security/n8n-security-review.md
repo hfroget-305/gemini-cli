@@ -24,10 +24,20 @@ enforce, follow `docs/security/patches/webhook-auth-shared-secret.md`:
 set the `TC_WEBHOOK_SECRET` n8n Variable, add the `X-TC-Secret` header on
 ElevenLabs / SalesIQ / Synthflow, then enable each node.
 
-Still open (not automatable from here): rotate the 3 leaked LLM keys (§1),
-delete the 2 orphaned credentials (§2), per-workflow success-retention off
-+ instance retention/redaction (§8), and toggle *Available in MCP* on the 4
-still-locked workflows (§7).
+Key rotation: ✅ **all three leaked LLM keys rotated/revoked by the owner on
+2026-07-06** — the top CRITICAL (§1) is closed.
+
+Still open (owner-side, not automatable from here): delete the 2 orphaned
+credentials (§2), per-workflow success-retention off + instance
+retention/redaction to age out old execution rows (§8), and toggle
+*Available in MCP* on the 4 still-locked workflows (§7).
+
+New workflow found in the 2026-07-06 execution audit: `IW2YiWSiRawDEgXh`
+"Zoho CRM Daily Digest" (schedule → Zoho leads/deals → Gmail digest to the
+owner). No webhook / no external surface, but its `Build Digest HTML` code
+node interpolates Zoho fields without HTML-escaping — same stored-HTML
+class as §3D/§3E. Low severity (internal recipient); apply the same `esc()`
+helper.
 
 ## What changed since the last review
 
