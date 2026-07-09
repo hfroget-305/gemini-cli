@@ -21,11 +21,7 @@ import { getErrorMessage } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import { getResponseText } from '../utils/partUtils.js';
-import {
-  fetchPinned,
-  resolveUrl,
-  type UrlResolution,
-} from '../utils/fetch.js';
+import { fetchPinned, resolveUrl, type UrlResolution } from '../utils/fetch.js';
 import { convert } from 'html-to-text';
 import {
   logWebFetchFallbackAttempt,
@@ -234,11 +230,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     try {
       const response = await retryWithBackoff(
         async () => {
-          const res = await fetchPinned(
-            url,
-            resolution!,
-            URL_FETCH_TIMEOUT_MS,
-          );
+          const res = await fetchPinned(url, resolution!, URL_FETCH_TIMEOUT_MS);
           if (!res.ok) {
             const error = new Error(
               `Request failed with status code ${res.status} ${res.statusText}`,

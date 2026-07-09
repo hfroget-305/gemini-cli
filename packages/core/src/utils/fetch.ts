@@ -9,7 +9,12 @@ import { URL } from 'node:url';
 import * as dns from 'node:dns/promises';
 import type { LookupOptions } from 'node:dns';
 import * as net from 'node:net';
-import { Agent, fetch as undiciFetch, ProxyAgent, setGlobalDispatcher } from 'undici';
+import {
+  Agent,
+  fetch as undiciFetch,
+  ProxyAgent,
+  setGlobalDispatcher,
+} from 'undici';
 
 // Hostnames that resolve to loopback regardless of /etc/hosts trickery.
 const LOOPBACK_HOSTNAMES = new Set([
@@ -20,10 +25,7 @@ const LOOPBACK_HOSTNAMES = new Set([
 ]);
 
 // Cloud-metadata service hostnames that MUST never be fetched.
-const METADATA_HOSTNAMES = new Set([
-  'metadata.google.internal',
-  'metadata',
-]);
+const METADATA_HOSTNAMES = new Set(['metadata.google.internal', 'metadata']);
 
 export class FetchError extends Error {
   constructor(
@@ -102,9 +104,10 @@ function isPrivateLiteral(hostname: string): boolean {
   if (LOOPBACK_HOSTNAMES.has(hostname.toLowerCase())) return true;
   if (METADATA_HOSTNAMES.has(hostname.toLowerCase())) return true;
   // Bracketed IPv6 literal in a URL keeps brackets in hostname; strip them.
-  const stripped = hostname.startsWith('[') && hostname.endsWith(']')
-    ? hostname.slice(1, -1)
-    : hostname;
+  const stripped =
+    hostname.startsWith('[') && hostname.endsWith(']')
+      ? hostname.slice(1, -1)
+      : hostname;
   if (net.isIP(stripped) === 4) return isPrivateIPv4(stripped);
   if (net.isIP(stripped) === 6) return isPrivateIPv6(stripped);
   return false;
@@ -171,9 +174,10 @@ export async function resolveUrl(url: string): Promise<UrlResolution | null> {
   const cached = resolutionCache.get(cacheKey);
   if (cached && cached.expires > Date.now()) return cached.resolution;
 
-  const stripped = hostname.startsWith('[') && hostname.endsWith(']')
-    ? hostname.slice(1, -1)
-    : hostname;
+  const stripped =
+    hostname.startsWith('[') && hostname.endsWith(']')
+      ? hostname.slice(1, -1)
+      : hostname;
 
   let resolution: UrlResolution;
   if (net.isIP(stripped) !== 0) {
@@ -295,7 +299,11 @@ export async function fetchPinned(
       lookup: (
         _host: string,
         _opts: LookupOptions,
-        cb: (err: NodeJS.ErrnoException | null, address: string, family: number) => void,
+        cb: (
+          err: NodeJS.ErrnoException | null,
+          address: string,
+          family: number,
+        ) => void,
       ) => cb(null, resolution.resolvedAddress, resolution.family),
     },
   });

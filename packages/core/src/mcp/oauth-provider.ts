@@ -304,7 +304,9 @@ export class MCPOAuthProvider {
                     .replace(/>/g, '&gt;')
                     .replace(/"/g, '&quot;')
                     .replace(/'/g, '&#39;');
-                res.writeHead(HTTP_OK, { 'Content-Type': 'text/html; charset=utf-8' });
+                res.writeHead(HTTP_OK, {
+                  'Content-Type': 'text/html; charset=utf-8',
+                });
                 res.end(`
               <html>
                 <body>
