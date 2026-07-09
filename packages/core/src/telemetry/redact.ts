@@ -159,11 +159,7 @@ export function redactSensitiveArgs(input: unknown): unknown {
   return walk(input, 0, new WeakSet());
 }
 
-function walk(
-  value: unknown,
-  depth: number,
-  seen: WeakSet<object>,
-): unknown {
+function walk(value: unknown, depth: number, seen: WeakSet<object>): unknown {
   if (depth > MAX_DEPTH) return '[TRUNCATED:depth]';
   if (value === null || value === undefined) return value;
   if (typeof value === 'string') return redactString(value);

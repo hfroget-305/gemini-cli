@@ -331,7 +331,10 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       'event.name': EVENT_TOOL_CALL,
       'event.timestamp': this['event.timestamp'],
       function_name: this.function_name,
-      function_args: safeJsonStringify(redactSensitiveArgs(this.function_args), 2),
+      function_args: safeJsonStringify(
+        redactSensitiveArgs(this.function_args),
+        2,
+      ),
       duration_ms: this.duration_ms,
       success: this.success,
       decision: this.decision,
