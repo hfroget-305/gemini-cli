@@ -673,7 +673,8 @@ export async function loadCliConfig(
     retryFetchErrors: settings.general?.retryFetchErrors ?? false,
     ptyInfo: ptyInfo?.name,
     modelConfigServiceConfig: settings.modelConfigs,
-    // TODO: loading of hooks based on workspace trust
+    // Workspace hook settings are filtered during settings loading unless
+    // folder trust is enabled and this workspace is trusted.
     enableHooks: settings.tools?.enableHooks ?? false,
     hooks: settings.hooks || {},
   });
