@@ -54,6 +54,10 @@ import type { ToolRegistry } from './tool-registry.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
+import {
+  sanitizeMcpDescription,
+  sanitizeSchemaDescriptions,
+} from './mcp-description-sanitizer.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -780,11 +784,21 @@ export async function discoverTools(
 
     const response = await mcpClient.listTools({}, options);
     const discoveredTools: DiscoveredMCPTool[] = [];
-    for (const toolDef of response.tools) {
+    for (const rawToolDef of response.tools) {
       try {
-        if (!isEnabled(toolDef, mcpServerName, mcpServerConfig)) {
+        if (!isEnabled(rawToolDef, mcpServerName, mcpServerConfig)) {
           continue;
         }
+
+        // Server-controlled text (descriptions, schema descriptions)
+        // flows into the model's function declarations and the tool
+        // confirmation UI; strip escape sequences, invisible Unicode,
+        // and unbounded length before either sees it.
+        const toolDef = {
+          ...rawToolDef,
+          description: sanitizeMcpDescription(rawToolDef.description),
+          inputSchema: sanitizeSchemaDescriptions(rawToolDef.inputSchema),
+        };
 
         const mcpCallableTool = new McpCallableTool(
           mcpClient,
@@ -811,7 +825,7 @@ export async function discoverTools(
         coreEvents.emitFeedback(
           'error',
           `Error discovering tool: '${
-            toolDef.name
+            rawToolDef.name
           }' from MCP server '${mcpServerName}': ${(error as Error).message}`,
           error,
         );
