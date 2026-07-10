@@ -9,6 +9,7 @@ import {
   sanitizeMcpDescription,
   sanitizeSchemaDescriptions,
   MAX_DESCRIPTION_LENGTH,
+  MAX_SCHEMA_ANNOTATION_BUDGET,
 } from './mcp-description-sanitizer.js';
 
 describe('sanitizeMcpDescription', () => {
@@ -153,16 +154,90 @@ describe('sanitizeSchemaDescriptions', () => {
     ]);
   });
 
-  it('does not hang on cyclic schemas', () => {
+  it('replaces cyclic references with a marker, never the raw node', () => {
     const a: Record<string, unknown> = { description: 'x\u200by' };
     a['self'] = a;
     const out = sanitizeSchemaDescriptions(a) as Record<string, unknown>;
     expect(out['description']).toBe('xy');
+    // Fail closed: the cyclic reference must not leak the original,
+    // unsanitized object back into the output.
+    expect(out['self']).toBe('[omitted: cyclic schema]');
   });
 
-  it('stops at depth limit without throwing', () => {
-    let node: Record<string, unknown> = { description: 'leaf\u200b' };
-    for (let i = 0; i < 40; i++) node = { child: node };
-    expect(() => sanitizeSchemaDescriptions(node)).not.toThrow();
+  it('replaces over-depth subtrees with a marker (no unsanitized passthrough)', () => {
+    // A description hidden 40 levels deep must NOT survive verbatim.
+    let node: Record<string, unknown> = {
+      description: 'inject\u200bion payload',
+    };
+    for (let i = 0; i < 40; i++) node = { properties: node };
+    const out = sanitizeSchemaDescriptions(node);
+    const serialized = JSON.stringify(out);
+    expect(serialized).not.toContain('payload');
+    expect(serialized).toContain('[omitted: schema exceeds maximum depth]');
+  });
+
+  it('sanitizes $comment and markdownDescription annotations', () => {
+    const schema = {
+      type: 'object',
+      $comment: 'note\u200b with \x1b[31mescape\x1b[0m',
+      properties: {
+        a: { type: 'string', markdownDescription: 'doc\u202e' },
+      },
+    };
+    const out = sanitizeSchemaDescriptions(schema);
+    expect(out.$comment).toBe('note with escape');
+    expect(out.properties.a.markdownDescription).toBe('doc');
+  });
+
+  it('copies data-valued keywords verbatim, including object values', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        mode: {
+          // Object enum values contain a key literally named
+          // "description" -- that is DATA, not an annotation, and
+          // rewriting it would break AJV validation against what the
+          // server advertised.
+          enum: [{ description: 'a\u200bb' }, 'plain'],
+          const: { title: 'c\u200bd' },
+          default: { description: 'e\u200bf' },
+          examples: [{ description: 'g\u200bh' }],
+        },
+      },
+    };
+    const out = sanitizeSchemaDescriptions(schema);
+    expect(out.properties.mode.enum).toEqual([
+      { description: 'a\u200bb' },
+      'plain',
+    ]);
+    expect(out.properties.mode.const).toEqual({ title: 'c\u200bd' });
+    expect(out.properties.mode.default).toEqual({ description: 'e\u200bf' });
+    expect(out.properties.mode.examples).toEqual([{ description: 'g\u200bh' }]);
+  });
+
+  it('enforces an aggregate annotation budget across the schema', () => {
+    // 20 properties \u00d7 15 KiB descriptions = 300 KiB raw. Individually
+    // each is under the per-string cap, but the shared budget must
+    // bound the total.
+    const properties: Record<string, unknown> = {};
+    for (let i = 0; i < 20; i++) {
+      properties[`p${i}`] = {
+        type: 'string',
+        description: 'x'.repeat(15_000),
+      };
+    }
+    const out = sanitizeSchemaDescriptions({ type: 'object', properties }) as {
+      properties: Record<string, { description: string }>;
+    };
+    const total = Object.values(out.properties).reduce(
+      (n, p) => n + p.description.length,
+      0,
+    );
+    expect(total).toBeLessThan(MAX_SCHEMA_ANNOTATION_BUDGET + 2048);
+    // Later annotations are dropped with a marker once the budget is
+    // spent.
+    expect(out.properties['p19'].description).toBe(
+      '[omitted: schema annotation budget exhausted]',
+    );
   });
 });

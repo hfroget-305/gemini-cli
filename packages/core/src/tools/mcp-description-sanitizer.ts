@@ -27,7 +27,8 @@
  *     encodes an invisible ASCII side channel). These hide text from
  *     a human reviewer while remaining fully visible to the model.
  *   - Unbounded length: a multi-hundred-KB description is a context
- *     flooding vector; cap it.
+ *     flooding vector; cap it — per string and in aggregate across a
+ *     schema.
  *
  * Legitimate descriptions — including non-Latin scripts, emoji, and
  * markdown — pass through unchanged.
@@ -36,7 +37,18 @@
 /** Maximum characters kept from a single description string. */
 export const MAX_DESCRIPTION_LENGTH = 16_384;
 
+/**
+ * Shared budget for all annotation strings across one schema. A
+ * server cannot flood the context by spreading near-cap descriptions
+ * over many properties: once the aggregate is spent, further
+ * annotation strings are dropped.
+ */
+export const MAX_SCHEMA_ANNOTATION_BUDGET = 65_536;
+
 const TRUNCATION_MARKER = '\n…[description truncated]';
+const DEPTH_MARKER = '[omitted: schema exceeds maximum depth]';
+const CYCLE_MARKER = '[omitted: cyclic schema]';
+const BUDGET_MARKER = '[omitted: schema annotation budget exhausted]';
 
 // ESC-initiated sequences: CSI (ESC [ ... final byte), OSC (ESC ]
 // ... BEL or ST), and any remaining lone ESC + byte. Also matches the
@@ -58,6 +70,21 @@ const CONTROL_PATTERN = /[\x00-\x08\x0b-\x1f\x7f\x80-\x9f]/g;
 const INVISIBLE_PATTERN =
   /[\u200b-\u200d\u2060\ufeff\u00ad\u202a-\u202e\u2066-\u2069\u061c\u180e]|\udb40[\udc00-\udc7f]/g;
 
+// Schema keys whose string values are annotations shown to the model
+// (or a human) rather than data — these get sanitized.
+const ANNOTATION_KEYS = new Set([
+  'description',
+  'title',
+  '$comment',
+  'markdownDescription',
+]);
+
+// Schema keys whose values are DATA (compared against arguments or
+// echoed back as defaults), not annotations. Rewriting these would
+// change validation semantics, so they are copied verbatim and not
+// recursed into.
+const DATA_VALUE_KEYS = new Set(['enum', 'const', 'default', 'examples']);
+
 /**
  * Sanitize a single server-supplied description string. Returns ''
  * for null/undefined input.
@@ -75,40 +102,65 @@ export function sanitizeMcpDescription(text: string | undefined): string {
 }
 
 /**
- * Return a copy of a JSON-schema-shaped object with every string
- * `description` (and `title`) field sanitized, recursively. Parameter
- * schemas reach the model the same way tool descriptions do, so they
- * are the same injection surface.
+ * Return a copy of a JSON-schema-shaped object with every annotation
+ * string (`description`, `title`, `$comment`, `markdownDescription`)
+ * sanitized, recursively. Parameter schemas reach the model the same
+ * way tool descriptions do, so they are the same injection surface.
  *
- * Structure and all other fields are preserved verbatim. Cycle-safe
- * and depth-limited so a hostile schema cannot hang discovery.
+ * Data-valued keywords (`enum`, `const`, `default`, `examples`) are
+ * copied verbatim — rewriting them would change validation semantics.
+ *
+ * Fail-closed structural guards: subtrees beyond the depth limit and
+ * cyclic references are REPLACED with an inert marker string, never
+ * forwarded unsanitized. Annotation strings share an aggregate
+ * budget ({@link MAX_SCHEMA_ANNOTATION_BUDGET}); once spent, further
+ * annotations are dropped.
  */
 export function sanitizeSchemaDescriptions<T>(schema: T): T {
-  return walkSchema(schema, 0, new WeakSet()) as T;
+  const budget = { remaining: MAX_SCHEMA_ANNOTATION_BUDGET };
+  return walkSchema(schema, 0, new WeakSet(), budget) as T;
 }
 
 const MAX_SCHEMA_DEPTH = 32;
+
+function sanitizeAnnotation(
+  value: string,
+  budget: { remaining: number },
+): string {
+  if (budget.remaining <= 0) return BUDGET_MARKER;
+  let out = sanitizeMcpDescription(value);
+  if (out.length > budget.remaining) {
+    out = out.slice(0, budget.remaining) + TRUNCATION_MARKER;
+  }
+  budget.remaining -= out.length;
+  return out;
+}
 
 function walkSchema(
   node: unknown,
   depth: number,
   seen: WeakSet<object>,
+  budget: { remaining: number },
 ): unknown {
-  if (depth > MAX_SCHEMA_DEPTH) return node;
   if (node === null || typeof node !== 'object') return node;
-  if (seen.has(node as object)) return node;
+  // Fail closed: never forward server-supplied subtrees that the
+  // sanitizer did not process.
+  if (depth > MAX_SCHEMA_DEPTH) return DEPTH_MARKER;
+  if (seen.has(node as object)) return CYCLE_MARKER;
   seen.add(node as object);
 
   if (Array.isArray(node)) {
-    return node.map((v) => walkSchema(v, depth + 1, seen));
+    return node.map((v) => walkSchema(v, depth + 1, seen, budget));
   }
 
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
-    if ((k === 'description' || k === 'title') && typeof v === 'string') {
-      out[k] = sanitizeMcpDescription(v);
+    if (ANNOTATION_KEYS.has(k) && typeof v === 'string') {
+      out[k] = sanitizeAnnotation(v, budget);
+    } else if (DATA_VALUE_KEYS.has(k)) {
+      out[k] = v;
     } else {
-      out[k] = walkSchema(v, depth + 1, seen);
+      out[k] = walkSchema(v, depth + 1, seen, budget);
     }
   }
   return out;
