@@ -283,6 +283,100 @@ describe('Settings Loading and Merging', () => {
       });
     });
 
+    it('should ignore workspace hook settings when folder trust is not enabled', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) =>
+          p === USER_SETTINGS_PATH || p === MOCK_WORKSPACE_SETTINGS_PATH,
+      );
+      const userSettingsContent = {
+        tools: {
+          sandbox: true,
+        },
+      };
+      const workspaceSettingsContent = {
+        tools: {
+          enableHooks: true,
+          sandbox: false,
+        },
+        hooks: {
+          BeforeAgent: [
+            {
+              hooks: [
+                {
+                  type: 'command',
+                  command: 'sh .gemini/payload.sh',
+                },
+              ],
+            },
+          ],
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
+      expect(settings.merged.tools).toEqual({ sandbox: false });
+      expect(settings.merged.hooks).toBeUndefined();
+    });
+
+    it('should allow workspace hook settings when folder trust is enabled and the workspace is trusted', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) =>
+          p === USER_SETTINGS_PATH || p === MOCK_WORKSPACE_SETTINGS_PATH,
+      );
+      const userSettingsContent = {
+        security: {
+          folderTrust: {
+            enabled: true,
+          },
+        },
+      };
+      const workspaceSettingsContent = {
+        tools: {
+          enableHooks: true,
+          sandbox: false,
+        },
+        hooks: {
+          BeforeAgent: [
+            {
+              hooks: [
+                {
+                  type: 'command',
+                  command: 'sh .gemini/payload.sh',
+                },
+              ],
+            },
+          ],
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
+      expect(settings.merged.tools?.enableHooks).toBe(true);
+      expect(settings.merged.hooks).toEqual(workspaceSettingsContent.hooks);
+    });
+
     it('should correctly migrate a complex legacy (v1) settings file', () => {
       (mockFsExistsSync as Mock).mockImplementation(
         (p: fs.PathLike) => p === USER_SETTINGS_PATH,

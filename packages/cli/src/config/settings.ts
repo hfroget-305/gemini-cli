@@ -406,6 +406,49 @@ export function migrateSettingsToV1(
   return v1Settings;
 }
 
+function isFolderTrustExplicitlyEnabled(settings: Settings): boolean {
+  return settings.security?.folderTrust?.enabled ?? false;
+}
+
+function stripWorkspaceHookSettings(workspace: Settings): Settings {
+  if (!workspace.hooks && workspace.tools?.enableHooks === undefined) {
+    return workspace;
+  }
+
+  const { hooks: _hooks, tools, ...rest } = workspace;
+  const sanitizedWorkspace = { ...rest } as Settings;
+
+  if (tools) {
+    const { enableHooks: _enableHooks, ...remainingTools } = tools;
+    if (Object.keys(remainingTools).length > 0) {
+      sanitizedWorkspace.tools = remainingTools;
+    }
+  }
+
+  return sanitizedWorkspace;
+}
+
+function shouldLoadWorkspaceHookSettings(
+  system: Settings,
+  systemDefaults: Settings,
+  user: Settings,
+  isTrusted: boolean,
+): boolean {
+  if (!isTrusted) {
+    return false;
+  }
+
+  const nonWorkspaceSettings = customDeepMerge(
+    getMergeStrategyForPath,
+    {},
+    systemDefaults,
+    user,
+    system,
+  ) as Settings;
+
+  return isFolderTrustExplicitlyEnabled(nonWorkspaceSettings);
+}
+
 function mergeSettings(
   system: Settings,
   systemDefaults: Settings,
@@ -413,7 +456,16 @@ function mergeSettings(
   workspace: Settings,
   isTrusted: boolean,
 ): Settings {
-  const safeWorkspace = isTrusted ? workspace : ({} as Settings);
+  let safeWorkspace = isTrusted ? workspace : ({} as Settings);
+
+  // Project-controlled hook settings can execute shell commands. Only honor
+  // them after the user/system has enabled folder trust and the current
+  // workspace passed that trust check.
+  if (
+    !shouldLoadWorkspaceHookSettings(system, systemDefaults, user, isTrusted)
+  ) {
+    safeWorkspace = stripWorkspaceHookSettings(safeWorkspace);
+  }
 
   // Settings are merged with the following precedence (last one wins for
   // single values):
