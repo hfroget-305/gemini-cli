@@ -29,6 +29,14 @@ import { ApprovalMode } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
+import {
+  WARNING_ICON,
+  ERROR_ICON,
+  INFO_ICON,
+  SCREEN_READER_WARNING,
+  SCREEN_READER_ERROR,
+  SCREEN_READER_INFO,
+} from '../textConstants.js';
 
 export const Composer = () => {
   const config = useConfig();
@@ -45,6 +53,8 @@ export const Composer = () => {
   const isAlternateBuffer = useAlternateBuffer();
   const { contextFileNames, showAutoAcceptIndicator } = uiState;
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
+
+  const prefixWidth = isScreenReaderEnabled ? 11 : 3;
   const hideContextSummary =
     suggestionsVisible && suggestionsPosition === 'above';
 
@@ -96,19 +106,54 @@ export const Composer = () => {
             <Text color={theme.status.error}>|⌐■_■| </Text>
           )}
           {uiState.ctrlCPressedOnce ? (
-            <Text color={theme.status.warning}>
-              Press Ctrl+C again to exit.
-            </Text>
+            <Box>
+              <Box width={prefixWidth} flexShrink={0}>
+                <Text color={theme.status.warning}>
+                  {isScreenReaderEnabled ? SCREEN_READER_WARNING : WARNING_ICON}
+                </Text>
+              </Box>
+              <Text color={theme.status.warning}>
+                Press Ctrl+C again to exit.
+              </Text>
+            </Box>
           ) : uiState.warningMessage ? (
-            <Text color={theme.status.warning}>{uiState.warningMessage}</Text>
+            <Box>
+              <Box width={prefixWidth} flexShrink={0}>
+                <Text color={theme.status.warning}>
+                  {isScreenReaderEnabled ? SCREEN_READER_WARNING : WARNING_ICON}
+                </Text>
+              </Box>
+              <Text color={theme.status.warning}>{uiState.warningMessage}</Text>
+            </Box>
           ) : uiState.ctrlDPressedOnce ? (
-            <Text color={theme.status.warning}>
-              Press Ctrl+D again to exit.
-            </Text>
+            <Box>
+              <Box width={prefixWidth} flexShrink={0}>
+                <Text color={theme.status.warning}>
+                  {isScreenReaderEnabled ? SCREEN_READER_WARNING : WARNING_ICON}
+                </Text>
+              </Box>
+              <Text color={theme.status.warning}>
+                Press Ctrl+D again to exit.
+              </Text>
+            </Box>
           ) : uiState.showEscapePrompt ? (
-            <Text color={theme.text.secondary}>Press Esc again to clear.</Text>
+            <Box>
+              <Box width={prefixWidth} flexShrink={0}>
+                <Text color={theme.text.secondary}>
+                  {isScreenReaderEnabled ? SCREEN_READER_INFO : INFO_ICON}
+                </Text>
+              </Box>
+              <Text color={theme.text.secondary}>Press Esc again to clear.</Text>
+            </Box>
           ) : uiState.queueErrorMessage ? (
-            <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>
+            <Box>
+              <Box width={prefixWidth} flexShrink={0}>
+                <Text color={theme.status.error}>
+                  {isScreenReaderEnabled ? SCREEN_READER_ERROR : ERROR_ICON}
+                </Text>
+              </Box>
+              <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>
+            </Box>
           ) : (
             !settings.merged.ui?.hideContextSummary &&
             !hideContextSummary && (
