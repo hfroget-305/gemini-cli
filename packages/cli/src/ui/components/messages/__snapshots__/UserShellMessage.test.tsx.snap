@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`UserShellMessage > removes leading ! from text 1`] = `"$ ls -la"`;
+
+exports[`UserShellMessage > renders shell message with correct prefix 1`] = `"$ ls -la"`;
