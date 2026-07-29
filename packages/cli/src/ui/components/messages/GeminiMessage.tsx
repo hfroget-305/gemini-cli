@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Text, Box } from 'ink';
+import { Text, Box, useIsScreenReaderEnabled } from 'ink';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { theme } from '../../semantic-colors.js';
 import { SCREEN_READER_MODEL_PREFIX } from '../../textConstants.js';
@@ -26,16 +26,15 @@ export const GeminiMessage: React.FC<GeminiMessageProps> = ({
   terminalWidth,
 }) => {
   const { renderMarkdown } = useUIState();
-  const prefix = '✦ ';
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
+  const prefix = isScreenReaderEnabled ? SCREEN_READER_MODEL_PREFIX : '✦ ';
   const prefixWidth = prefix.length;
 
   const isAlternateBuffer = useAlternateBuffer();
   return (
     <Box flexDirection="row">
-      <Box width={prefixWidth}>
-        <Text color={theme.text.accent} aria-label={SCREEN_READER_MODEL_PREFIX}>
-          {prefix}
-        </Text>
+      <Box width={prefixWidth} flexShrink={0}>
+        <Text color={theme.text.accent}>{prefix}</Text>
       </Box>
       <Box flexGrow={1} flexDirection="column">
         <MarkdownDisplay
