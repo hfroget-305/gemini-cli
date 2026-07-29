@@ -118,9 +118,21 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
+        Ctrl+A / Home
+      </Text>{' '}
+      - Jump to start of line
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
         Ctrl+C
       </Text>{' '}
       - Quit application
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        Ctrl+E / End
+      </Text>{' '}
+      - Jump to end of line
     </Text>
     <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
@@ -135,6 +147,12 @@ export const Help: React.FC<Help> = ({ commands }) => (
         Ctrl+L
       </Text>{' '}
       - Clear the screen
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        Ctrl+R
+      </Text>{' '}
+      - Reverse search through history
     </Text>
     <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
