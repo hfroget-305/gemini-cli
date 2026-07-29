@@ -5,20 +5,24 @@
  */
 
 import type React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { theme } from '../../semantic-colors.js';
+import { SCREEN_READER_SHELL_PREFIX } from '../../textConstants.js';
 
 interface UserShellMessageProps {
   text: string;
 }
 
 export const UserShellMessage: React.FC<UserShellMessageProps> = ({ text }) => {
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
   // Remove leading '!' if present, as App.tsx adds it for the processor.
   const commandToDisplay = text.startsWith('!') ? text.substring(1) : text;
 
   return (
     <Box>
-      <Text color={theme.ui.symbol}>$ </Text>
+      <Text color={theme.ui.symbol}>
+        {isScreenReaderEnabled ? SCREEN_READER_SHELL_PREFIX : '$ '}
+      </Text>
       <Text color={theme.text.primary}>{commandToDisplay}</Text>
     </Box>
   );
