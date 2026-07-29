@@ -118,6 +118,12 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
+        Ctrl+A / Home
+      </Text>{' '}
+      - Move cursor to start of line
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
         Ctrl+C
       </Text>{' '}
       - Quit application
@@ -132,15 +138,39 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
+        Ctrl+E / End
+      </Text>{' '}
+      - Move cursor to end of line
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        Ctrl+K
+      </Text>{' '}
+      - Delete to end of line
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
         Ctrl+L
       </Text>{' '}
       - Clear the screen
     </Text>
     <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
+        Ctrl+R
+      </Text>{' '}
+      - Search history
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
         Ctrl+S
       </Text>{' '}
       - Enter selection mode to copy text
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        Ctrl+U
+      </Text>{' '}
+      - Delete to start of line
     </Text>
     <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
@@ -180,7 +210,7 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
-        Up/Down
+        Up/Down / Ctrl+P/N
       </Text>{' '}
       - Cycle through your prompt history
     </Text>
