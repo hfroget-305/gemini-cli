@@ -5,10 +5,11 @@
  */
 
 import type React from 'react';
-import { Box } from 'ink';
+import { Box, useIsScreenReaderEnabled } from 'ink';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
+import { SCREEN_READER_MODEL_PREFIX } from '../../textConstants.js';
 
 interface GeminiMessageContentProps {
   text: string;
@@ -29,9 +30,10 @@ export const GeminiMessageContent: React.FC<GeminiMessageContentProps> = ({
   availableTerminalHeight,
   terminalWidth,
 }) => {
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
   const { renderMarkdown } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
-  const originalPrefix = '✦ ';
+  const originalPrefix = isScreenReaderEnabled ? SCREEN_READER_MODEL_PREFIX : '✦ ';
   const prefixWidth = originalPrefix.length;
 
   return (
