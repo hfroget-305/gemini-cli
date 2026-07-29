@@ -21,3 +21,5 @@ export const SCREEN_READER_INFO = '[info] ';
 export const SCREEN_READER_WARNING = '[warning] ';
 export const SCREEN_READER_ERROR = '[error] ';
 export const SCREEN_READER_DEBUG = '[debug] ';
+
+export const SCREEN_READER_SHELL_PREFIX = '[shell] ';
