@@ -66,8 +66,15 @@ describe('Help Component', () => {
     const output = lastFrame();
 
     expect(output).toContain('Keyboard Shortcuts:');
+    expect(output).toContain('Ctrl+A / Home');
     expect(output).toContain('Ctrl+C');
+    expect(output).toContain('Ctrl+D');
+    expect(output).toContain('Ctrl+E / End');
+    expect(output).toContain('Ctrl+K');
+    expect(output).toContain('Ctrl+P / Ctrl+N');
+    expect(output).toContain('Ctrl+R');
     expect(output).toContain('Ctrl+S');
+    expect(output).toContain('Ctrl+U');
     expect(output).toContain('Page Up/Down');
     unmount();
   });

@@ -118,9 +118,27 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
+        Ctrl+A / Home
+      </Text>{' '}
+      - Move the cursor to the start of the line
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
         Ctrl+C
       </Text>{' '}
       - Quit application
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        Ctrl+D
+      </Text>{' '}
+      - Exit the CLI when the input buffer is empty
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        Ctrl+E / End
+      </Text>{' '}
+      - Move the cursor to the end of the line
     </Text>
     <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
@@ -132,15 +150,39 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
+        Ctrl+K
+      </Text>{' '}
+      - Delete from the cursor to the end of the line
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
         Ctrl+L
       </Text>{' '}
       - Clear the screen
     </Text>
     <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
+        Ctrl+P / Ctrl+N
+      </Text>{' '}
+      - Show the previous/next entry in history
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        Ctrl+R
+      </Text>{' '}
+      - Start reverse search through history
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
         Ctrl+S
       </Text>{' '}
       - Enter selection mode to copy text
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        Ctrl+U
+      </Text>{' '}
+      - Delete from the cursor to the start of the line
     </Text>
     <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
