@@ -1,0 +1,39 @@
+{{ (() => {
+  const esc = (v) => String(v ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  const j = $json;
+  const ZOHO_ID_RE = /^[0-9]{6,32}$/;
+  const idSafe = ZOHO_ID_RE.test(String(j.id ?? '')) ? j.id : '';
+  const crmLink = idSafe ? 'https://crm.zoho.com/crm/org764080561/tab/Leads/' + idSafe : 'https://crm.zoho.com/crm/org764080561/tab/Leads';
+  const dest = Array.isArray(j.Destino_11) ? j.Destino_11.join(', ') : (j.Destino_11 || 'Not specified');
+  const received = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
+  return `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f9f9f9;border-radius:8px;overflow:hidden">
+  <div style="background:#1B2A4A;padding:20px 24px">
+    <h1 style="color:#fff;margin:0;font-size:22px">🔥 New Hot Lead — GoTravelCloud</h1>
+    <p style="color:#aaa;margin:4px 0 0">Received: ${esc(received)}</p>
+  </div>
+  <div style="padding:24px;background:#fff">
+    <table style="width:100%;border-collapse:collapse">
+      <tr style="background:#E8500A">
+        <td style="padding:10px 14px;color:#fff;font-weight:bold;font-size:18px" colspan="2">
+          ${esc((j.First_Name||'') + ' ' + (j.Last_Name||''))}
+          <span style="background:#fff;color:#E8500A;padding:2px 10px;border-radius:12px;font-size:13px;margin-left:10px">${esc(j.Lead_Grade || 'New')}</span>
+        </td>
+      </tr>
+      <tr style="background:#f5f5f5"><td style="padding:8px 14px;font-weight:bold;width:38%">📞 Phone</td><td style="padding:8px 14px">${esc(j.Phone || '⚠️ MISSING')}</td></tr>
+      <tr><td style="padding:8px 14px;font-weight:bold">📧 Email</td><td style="padding:8px 14px">${esc(j.Email || '⚠️ MISSING')}</td></tr>
+      <tr style="background:#f5f5f5"><td style="padding:8px 14px;font-weight:bold">📻 Lead Source</td><td style="padding:8px 14px">${esc(j.Lead_Source || '—')}</td></tr>
+      <tr><td style="padding:8px 14px;font-weight:bold">✈️ Destination</td><td style="padding:8px 14px">${esc(dest)}</td></tr>
+      <tr style="background:#f5f5f5"><td style="padding:8px 14px;font-weight:bold">🌐 Landing Page</td><td style="padding:8px 14px">${esc(j.Medio || '—')}</td></tr>
+      <tr><td style="padding:8px 14px;font-weight:bold">👤 Q/NQ Status</td><td style="padding:8px 14px">${esc(j.Calificar_Paquete_Q_NQ || 'Pending')}</td></tr>
+      <tr style="background:#f5f5f5"><td style="padding:8px 14px;font-weight:bold">👔 Assigned Rep</td><td style="padding:8px 14px">${esc(j.Vendedor || 'Unassigned')}</td></tr>
+      <tr><td style="padding:8px 14px;font-weight:bold">⭐ TC Score</td><td style="padding:8px 14px;font-weight:bold;color:#E8500A">${esc(j.TC_Score || 'Not scored')} / 100</td></tr>
+    </table>
+  </div>
+  <div style="background:#1B2A4A;padding:16px 24px;text-align:center">
+    <a href="${esc(crmLink)}" style="background:#E8500A;color:#fff;padding:10px 28px;border-radius:4px;text-decoration:none;font-weight:bold;font-size:15px">OPEN IN ZOHO CRM →</a>
+  </div>
+  <p style="text-align:center;color:#aaa;font-size:11px;padding:12px">GoTravelCloud Lead Alert · 1-800-601-6414 · gotravelcloud.com</p>
+</div>`;
+})() }}
