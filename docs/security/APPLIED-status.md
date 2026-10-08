@@ -1,6 +1,6 @@
 # n8n Repairs — Applied Status
 
-Last updated: 2026-09-14. Records what has been applied **live** to the n8n
+Last updated: 2026-10-08. Records what has been applied **live** to the n8n
 instance via MCP vs. what remains blocked on secrets/provider config.
 
 ## ✅ Applied live (via MCP `update_workflow`)
@@ -12,6 +12,7 @@ instance via MCP vs. what remains blocked on secrets/provider config.
 | AI Voice Follow-up (WF4) | `ZByC1P9VYGV28OI2` | Prompt-injection guards on both Claude nodes (outbound CRM data + inbound message) | "prompt-injection guards on Claude nodes" |
 | AI Voice Follow-up (WF4) | `ZByC1P9VYGV28OI2` | Fail-closed `Verify Secret` gate + 401 responder on inbound webhook | "inbound webhook shared-secret gate" |
 | Facebook Lead Ads (WF1, live) | `p0fYHq69WohYcZC7` | `Lead Data Valid?` gate — forged/failed Graph fetches dead-end instead of creating blank leads | "drop leads with no Graph API data" |
+| RingCentral → Zoho (WF2, live) | `c6yYzZbXSg25ygTg` | Fail-closed `Verify RC Token` gate — passes only when `RC_VERIFICATION_TOKEN` is set AND the `Verification-Token` header matches; non-matching requests dead-end with no Zoho lead | "RingCentral webhook token gate" |
 
 **Effect:** the cross-workflow prompt-injection chain is closed at every
 consumer; the 5th leaked key no longer lives in any workflow; forged FB POSTs
@@ -27,11 +28,13 @@ These require values only you have; applying them blind would drop real leads.
 |---|---|---|---|
 | Facebook Lead Ads (live) | GET handshake accepts anyone | `FB_VERIFY_TOKEN` variable | A fail-closed gate would break Meta's re-subscription handshake if the token isn't set. The POST/lead path is already protected by the fetch-validity gate above. |
 | Facebook Lead Ads (live) | POST not HMAC-verified | `FB_APP_SECRET` + webhook Raw Body ON | Needs the app secret and raw-body config; wrong setup silently rejects real events. |
-| RingCentral → Zoho (live) | Unauthenticated webhook → junk CRM leads | `RC_VERIFICATION_TOKEN` variable **and** RC subscription set to send it | A fail-closed gate on a **live** webhook with no token configured would drop **all** real calls. Its injection risk is already neutralized downstream (WF4 guards). |
 
-Specs for all three are ready in
+~~RingCentral webhook auth~~ — **APPLIED 2026-10-08** (see above); prerequisites
+confirmed in place (token set + RC sending the header).
+
+Specs for the two remaining FB items are ready in
 `patches/live-webhook-verification.md` (operations JSON + UI steps). Once you
-set the variables and provider headers, they can be applied in one pass.
+set `FB_VERIFY_TOKEN` / `FB_APP_SECRET`, they can be applied in one pass.
 
 ## 👤 User-only actions (cannot be done from n8n)
 
@@ -41,8 +44,8 @@ set the variables and provider headers, they can be applied in one pass.
    value stays live until rotated.
 2. **Set `TC_WEBHOOK_SECRET`** + the `X-TC-Secret` header on the SimpleLife
    callers before activating those workflows (gates are fail-closed).
-3. **Set** `FB_VERIFY_TOKEN`, `FB_APP_SECRET`, `RC_VERIFICATION_TOKEN` to unblock
-   the live-webhook fixes above.
+3. **Set** `FB_VERIFY_TOKEN` and `FB_APP_SECRET` to unblock the two remaining
+   FB fixes. (`RC_VERIFICATION_TOKEN` is already set — RC gate is live.)
 
 ## Note
 
